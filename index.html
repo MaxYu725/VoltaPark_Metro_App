@@ -176,7 +176,7 @@
 
         input[type=range]::-webkit-slider-thumb {
             height: 20px;
-            width: 10px;
+            width: 100px;
             background: #ffffff;
             border: 1px solid #fa6800;
             cursor: pointer;
@@ -198,7 +198,6 @@
             overflow-y: auto;
             padding: 0 15px 20px 15px;
             position: relative;
-            scroll-behavior: smooth; /* 平滑滾動 */
         }
 
         /* 地圖精細標籤樣式 */
@@ -252,6 +251,20 @@
             border: 2px solid #fff;
             border-radius: 50%;
             box-shadow: 0 0 10px rgba(250, 104, 0, 0.8);
+        }
+
+        /* 地圖連線中間的距離標籤 */
+        .line-distance-badge {
+            background: rgba(0, 0, 0, 0.9);
+            border: 1px solid #fa6800;
+            color: #fa6800;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.8);
+            pointer-events: none;
         }
 
         /* Nearby 列表項目與高亮效果 */
@@ -525,6 +538,7 @@
         let map = null;
         let userMarker = null;
         let mapMarkersMap = new Map();
+        let lineDistanceMarker = null; // 地圖連線正中間的距離數字標籤
         let currentRadius = 5.0; 
         let selectedParkId = null;
 
@@ -723,7 +737,62 @@
             updateDashboard();
         }
 
-        // 精確連動邏輯：地圖飛行 + 精確將列表項目置於「列表視窗區域中央」
+        // 地圖畫線功能：在使用者與目標停車場之間繪製虛線 + 標示距離
+        function updateConnectingLine(park) {
+            if (!map || !lastPosition) return;
+            const uLng = lastPosition.coords.longitude;
+            const uLat = lastPosition.coords.latitude;
+            const pLng = park.longitude;
+            const pLat = park.latitude;
+
+            const lineGeoJSON = {
+                'type': 'Feature',
+                'geometry': {
+                    'type': 'LineString',
+                    'coordinates': [[uLng, uLat], [pLng, pLat]]
+                }
+            };
+
+            if (map.getSource('connecting-line')) {
+                map.getSource('connecting-line').setData(lineGeoJSON);
+            } else {
+                map.addSource('connecting-line', {
+                    'type': 'geojson',
+                    'data': lineGeoJSON
+                });
+
+                map.addLayer({
+                    'id': 'connecting-line-layer',
+                    'type': 'line',
+                    'source': 'connecting-line',
+                    'layout': {
+                        'line-join': 'round',
+                        'line-cap': 'round'
+                    },
+                    'paint': {
+                        'line-color': '#fa6800',
+                        'line-width': 3,
+                        'line-dasharray': [2, 1]
+                    }
+                });
+            }
+
+            // 線段中央的距離數字標籤
+            const midLng = (uLng + pLng) / 2;
+            const midLat = (uLat + pLat) / 2;
+
+            if (lineDistanceMarker) lineDistanceMarker.remove();
+
+            const el = document.createElement('div');
+            el.className = 'line-distance-badge';
+            el.innerText = park.distanceDisplay;
+
+            lineDistanceMarker = new maplibregl.Marker({ element: el })
+                .setLngLat([midLng, midLat])
+                .addTo(map);
+        }
+
+        // 精確連動邏輯：地圖飛行 + 畫線 + 將列表項目精確置於「列表視窗區域中央」
         function selectCarpark(parkId) {
             selectedParkId = parkId;
             const park = parkingStations.find(p => p.id === parkId);
@@ -739,7 +808,10 @@
                 });
             }
 
-            // 2. 更新地圖標籤高亮狀態
+            // 2. 畫連接線與距離標籤
+            updateConnectingLine(park);
+
+            // 3. 更新地圖標籤高亮狀態
             mapMarkersMap.forEach((marker, id) => {
                 const el = marker.getElement();
                 if (id === parkId) {
@@ -749,28 +821,35 @@
                 }
             });
 
-            // 3. 更新列表項目高亮，並計算距離「列表視窗中央」的偏移量平滑滾動
+            // 4. 更新列表項目高亮，並計算距離「列表視窗中央」的偏移量進行 smooth scrollBy
             const listContainer = document.getElementById('nearby-list');
             const listItems = document.querySelectorAll('.nearby-item');
-            
+            let targetItem = null;
+
             listItems.forEach(item => {
                 if (item.dataset.id === parkId) {
                     item.classList.add('active');
-                    
-                    // 精確計算置中 Top 距離（相對於 #nearby-list 容器視窗，非全螢幕）
-                    const containerHeight = listContainer.clientHeight;
-                    const itemTop = item.offsetTop - listContainer.offsetTop;
-                    const itemHeight = item.clientHeight;
-                    const targetScrollTop = itemTop - (containerHeight / 2) + (itemHeight / 2);
-
-                    listContainer.scrollTo({
-                        top: targetScrollTop,
-                        behavior: 'smooth'
-                    });
+                    targetItem = item;
                 } else {
                     item.classList.remove('active');
                 }
             });
+
+            if (targetItem && listContainer) {
+                const containerRect = listContainer.getBoundingClientRect();
+                const itemRect = targetItem.getBoundingClientRect();
+
+                // 計算 targetItem 中心點相對於 listContainer 中心點的像素差距
+                const itemCenter = itemRect.top + itemRect.height / 2;
+                const containerCenter = containerRect.top + containerRect.height / 2;
+                const scrollDiff = itemCenter - containerCenter;
+
+                // 純容器內部位移，絕對不會干擾 outer window 或 .app-container
+                listContainer.scrollBy({
+                    top: scrollDiff,
+                    behavior: 'smooth'
+                });
+            }
         }
 
         // 渲染 Nearby 頁面
@@ -780,6 +859,11 @@
 
             mapMarkersMap.forEach(m => m.remove());
             mapMarkersMap.clear();
+
+            if (lineDistanceMarker) {
+                lineDistanceMarker.remove();
+                lineDistanceMarker = null;
+            }
 
             const filtered = parkingStations.filter(p => p.rawDistance <= currentRadius);
 
