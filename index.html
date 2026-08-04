@@ -285,7 +285,7 @@
 
         <div class="pivot-content active" id="home">
             <div class="status-bar">
-                <span class="status-text location-status">等待授權定位...</span>
+                <span class="status-text location-status">等待初始化...</span>
             </div>
             <div class="tile-grid">
                 
@@ -297,7 +297,7 @@
                             <div id="dash-nearest-dist" style="font-size:14px; opacity:0.8;">--</div>
                         </div>
                         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 15px;">
-                            <div id="dash-nearest-name" style="font-size: 24px; font-weight: 400; line-height: 1.1; max-width: 65%;">請先授權定位</div>
+                            <div id="dash-nearest-name" style="font-size: 24px; font-weight: 400; line-height: 1.1; max-width: 65%;">等待定位...</div>
                             <div id="dash-nearest-val" style="font-size: 48px; font-weight: 300; line-height: 1;">--</div>
                         </div>
                     </div>
@@ -355,7 +355,6 @@
 
         document.addEventListener('DOMContentLoaded', () => {
             initPivot();
-            // 反轉流程：先拿定位，有了 extent 之後才抓 API
             startAppProcess();
         });
 
@@ -397,7 +396,6 @@
             return R * c; // 回傳公里 (km)
         }
 
-        // 精細化距離顯示邏輯 (小於 1km 顯示 m，否則顯示 km)
         function formatDistance(distKm) {
             if (distKm < 1) {
                 return Math.round(distKm * 1000) + " m";
@@ -411,6 +409,7 @@
         // ==========================================
         function startAppProcess() {
             updateStatusText("正在獲取 GPS 定位...");
+            document.getElementById('dash-nearest-name').innerText = "定位中...";
             
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
@@ -418,8 +417,9 @@
                         const userLat = position.coords.latitude;
                         const userLng = position.coords.longitude;
                         
-                        // 計算約 5 公里半徑的 Bounding Box (Extent)
-                        // 1 度緯度約 111 公里，1 度經度在香港(22度)約 102 公里
+                        // 定位成功後，立刻更新 UI 讓使用者知道正在連線
+                        document.getElementById('dash-nearest-name').innerText = "正在下載資料...";
+                        
                         const dLat = 5 / 111;
                         const dLng = 5 / 102;
                         const extent = `${userLng - dLng},${userLat - dLat},${userLng + dLng},${userLat + dLat}`;
@@ -429,23 +429,23 @@
                     (error) => {
                         console.warn('GPS 失敗:', error);
                         updateStatusText("未授權定位，下載全港資料中...");
-                        // GPS 失敗時，不帶 extent，退回抓全港資料
+                        document.getElementById('dash-nearest-name').innerText = "未授權定位";
                         fetchGovParkingData(null, null, null);
                     },
                     { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
                 );
             } else {
                 updateStatusText("瀏覽器不支援定位，下載全港資料中...");
+                document.getElementById('dash-nearest-name').innerText = "不支援定位";
                 fetchGovParkingData(null, null, null);
             }
         }
 
         // ==========================================
-        // 強化版 API 抓取 (相容兩種結構，支援 Extent)
+        // API 抓取
         // ==========================================
         async function fetchGovParkingData(extent, userLat, userLng) {
             try {
-                // 根據有沒有 extent 決定使用哪組 URL
                 let infoUrl = 'https://resource.data.one.gov.hk/td/carpark/basic_info_all.json';
                 let vacancyUrl = 'https://resource.data.one.gov.hk/td/carpark/vacancy_all.json';
                 
@@ -465,7 +465,6 @@
                 const infoData = await infoRes.json();
                 const vacData = await vacRes.json();
 
-                // 為了相容 api.data.gov.hk (results) 與 resource.data.one (car_park) 結構
                 const infoList = infoData.results || infoData.car_park || [];
                 const vacList = vacData.results || vacData.car_park || [];
 
@@ -474,7 +473,6 @@
                     let available = -1;
                     const vTypes = v.vehicleTypes || v.vehicle_type || [];
 
-                    // 尋找私家車相關的物件
                     const pType = vTypes.find(t => {
                         const tName = t.type || '';
                         return tName.toLowerCase().includes('private') || tName === 'P';
@@ -494,7 +492,6 @@
                     }
                     
                     if (isNaN(available)) available = -1;
-                    // 相容 park_Id 與 park_id
                     const idStr = String(v.park_Id || v.park_id).trim();
                     vacMap[idStr] = available;
                 });
@@ -504,7 +501,6 @@
                     const lng = parseFloat(p.longitude);
                     const idStr = String(p.park_Id || p.park_id).trim();
                     
-                    // 相容不同的大小寫與欄位
                     let displayAddr = p.displayAddress_tc || p.displayaddress_tc || p.displayAddress_en || p.displayaddress_en || p.address || '';
                     if (displayAddr.trim() === '') {
                         displayAddr = p.district_tc || p.district_en || '地址未提供';
@@ -526,7 +522,6 @@
                 document.getElementById('dash-api-status').innerText = "正常";
                 document.getElementById('dash-api-status').style.color = "#ffffff";
 
-                // 如果有拿到定位，就計算距離並排序
                 if (userLat && userLng) {
                     updateArrayDistances(userLat, userLng);
                     updateStatusText("已定位，顯示附近資料");
@@ -539,6 +534,7 @@
                 console.error("API 串接失敗:", error);
                 document.getElementById('dash-api-status').innerText = "連線失敗";
                 document.getElementById('dash-api-status').style.color = "#ce352c";
+                document.getElementById('dash-nearest-name').innerText = "連線失敗";
                 updateStatusText("API 錯誤");
                 document.getElementById('parking-list').innerHTML = '<div class="loading-text">無法連接政府開放數據</div>';
             }
@@ -576,7 +572,6 @@
             const dashExpandList = document.getElementById('dash-expanded-list');
 
             if (parkingStations.length > 0) {
-                // 第一名：大磚塊顯示
                 const nearest = parkingStations[0];
                 dashName.innerText = nearest.name;
                 dashDist.innerText = nearest.rawDistance === 9999 ? '未知' : nearest.distance;
@@ -586,7 +581,6 @@
                 else if (nearest.available > 0 && nearest.available < 15) dashVal.style.color = '#fa6800';
                 else dashVal.style.color = '#ffffff';
 
-                // 第 2~4 名：展開清單緊湊顯示
                 dashExpandList.innerHTML = '';
                 const nextThree = parkingStations.slice(1, 4);
                 nextThree.forEach(p => {
