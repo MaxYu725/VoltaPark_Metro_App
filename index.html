@@ -176,7 +176,7 @@
 
         .park-distance {
             font-size: 14px;
-            color: #1ba1e2; /* 藍色代表普通停車 */
+            color: #1ba1e2; 
             font-weight: 600;
         }
 
@@ -200,7 +200,7 @@
             margin-top: 4px;
         }
 
-        /* 充電站列表項目 (EV Tile) - 沿用之前設計 */
+        /* 充電站列表項目 (EV Tile) */
         .ev-item {
             background-color: #1a1a1a;
             margin-bottom: 15px;
@@ -241,7 +241,7 @@
 <body>
 
     <div class="app-container">
-        <!-- Pivot Headers (將 home 移至首位，作為儀表板入口) -->
+        <!-- Pivot Headers -->
         <div class="pivot-container" id="pivot-headers">
             <span class="pivot-header active" data-target="home">home</span>
             <span class="pivot-header" data-target="parking">parking</span>
@@ -251,15 +251,13 @@
         <!-- Home Page -->
         <div class="pivot-content active" id="home">
             <div class="status-bar">
-                <span class="status-text">概覽 · 北區</span>
+                <span class="status-text location-status">等待授權定位...</span>
             </div>
             <div class="tile-grid">
-                <!-- 點擊跳轉至 Parking -->
                 <div class="tile wide bg-blue" onclick="navigateTo('parking')">
                     <div class="tile-title">附近空餘車位</div>
                     <div class="tile-value" id="dash-parking-total">--</div>
                 </div>
-                <!-- 點擊跳轉至 EV -->
                 <div class="tile bg-green" onclick="navigateTo('ev')">
                     <div class="tile-title">可用快充</div>
                     <div class="tile-value" id="dash-ev-fast">--</div>
@@ -278,63 +276,61 @@
         <!-- Parking Page -->
         <div class="pivot-content" id="parking">
             <div class="status-bar">
-                <span class="status-text">已按距離排序</span>
+                <span class="status-text location-status">計算距離中...</span>
             </div>
-            <div id="parking-list">
-                <!-- 停車場列表由 JS 動態渲染 -->
-            </div>
+            <div id="parking-list"></div>
         </div>
 
         <!-- EV Charge Page -->
         <div class="pivot-content" id="ev">
             <div class="status-bar">
-                <span class="status-text">已按距離排序</span>
+                <span class="status-text location-status">計算距離中...</span>
                 <span class="action-text">篩選插頭類型</span>
             </div>
-            <div id="ev-list">
-                <!-- 充電站列表由 JS 動態渲染 -->
-            </div>
+            <div id="ev-list"></div>
         </div>
     </div>
 
     <script>
-        // --- 模擬數據區 ---
-        const mockEvStations = [
-            { id: "ev_001", name: "領展 - 祥華商場", address: "粉嶺新運路38號", distance: "0.8 km", status: "online", fast: { total: 3, available: 2 }, medium: { total: 5, available: 0 } },
-            { id: "ev_002", name: "海聯廣場", address: "粉嶺聯和墟和睦路9號", distance: "1.2 km", status: "online", fast: { total: 2, available: 0 }, medium: { total: 4, available: 1 } },
-            { id: "ev_003", name: "Tesla 超充 - 上水匯", address: "上水石湖墟龍琛路48號", distance: "2.5 km", status: "online", fast: { total: 6, available: 5 }, medium: { total: 0, available: 0 } },
-            { id: "ev_004", name: "粉嶺中心 (維護中)", address: "粉嶺新運路33號", distance: "1.0 km", status: "offline", fast: { total: 2, available: 0 }, medium: { total: 2, available: 0 } }
+        // --- 模擬數據 (已補上真實經緯度) ---
+        let mockEvStations = [
+            { id: "ev_001", name: "領展 - 祥華商場", address: "粉嶺新運路38號", lat: 22.4918, lng: 114.1430, distance: "等待定位...", status: "online", fast: { total: 3, available: 2 }, medium: { total: 5, available: 0 } },
+            { id: "ev_002", name: "海聯廣場", address: "粉嶺聯和墟和睦路9號", lat: 22.4990, lng: 114.1470, distance: "等待定位...", status: "online", fast: { total: 2, available: 0 }, medium: { total: 4, available: 1 } },
+            { id: "ev_003", name: "Tesla 超充 - 上水匯", address: "上水石湖墟龍琛路48號", lat: 22.5033, lng: 114.1273, distance: "等待定位...", status: "online", fast: { total: 6, available: 5 }, medium: { total: 0, available: 0 } },
+            { id: "ev_004", name: "粉嶺中心 (維護中)", address: "粉嶺新運路33號", lat: 22.4925, lng: 114.1400, distance: "等待定位...", status: "offline", fast: { total: 2, available: 0 }, medium: { total: 2, available: 0 } }
         ];
 
-        const mockParkingStations = [
-            { id: "p_001", name: "上水匯停車場", address: "上水石湖墟龍琛路48號", distance: "0.5 km", total: 150, available: 42 },
-            { id: "p_002", name: "粉嶺中心停車場", address: "粉嶺新運路33號", distance: "1.0 km", total: 200, available: 12 },
-            { id: "p_003", name: "聯和墟市政大廈", address: "粉嶺和滿街9號", distance: "1.5 km", total: 80, available: 0 },
-            { id: "p_004", name: "海聯廣場停車場", address: "粉嶺聯和墟和睦路9號", distance: "1.2 km", total: 120, available: 65 }
+        let mockParkingStations = [
+            { id: "p_001", name: "上水匯停車場", address: "上水石湖墟龍琛路48號", lat: 22.5033, lng: 114.1273, distance: "等待定位...", total: 150, available: 42 },
+            { id: "p_002", name: "粉嶺中心停車場", address: "粉嶺新運路33號", lat: 22.4925, lng: 114.1400, distance: "等待定位...", total: 200, available: 12 },
+            { id: "p_003", name: "聯和墟市政大廈", address: "粉嶺和滿街9號", lat: 22.4975, lng: 114.1458, distance: "等待定位...", total: 80, available: 0 },
+            { id: "p_004", name: "海聯廣場停車場", address: "粉嶺聯和墟和睦路9號", lat: 22.4990, lng: 114.1470, distance: "等待定位...", total: 120, available: 65 }
         ];
 
         // --- 初始化邏輯 ---
         document.addEventListener('DOMContentLoaded', () => {
             initPivot();
+            updateDashboard();
+            
+            // 先渲染一次骨架與假資料
             renderEvStations();
             renderParkingStations();
-            updateDashboard();
+            
+            // 嘗試獲取 GPS 定位
+            getUserLocation();
         });
 
-        // 處理 Metro Pivot 導覽切換
+        // --- 導覽切換 ---
         function initPivot() {
             const headers = document.querySelectorAll('.pivot-header');
             headers.forEach(header => {
                 header.addEventListener('click', () => {
-                    const targetId = header.getAttribute('data-target');
-                    navigateTo(targetId);
+                    navigateTo(header.getAttribute('data-target'));
                 });
             });
         }
 
-        // 提供給動態磚跳轉使用的函數
         function navigateTo(targetId) {
-            // 更新 Header
             document.querySelectorAll('.pivot-header').forEach(h => {
                 if(h.getAttribute('data-target') === targetId) {
                     h.classList.add('active');
@@ -343,47 +339,114 @@
                     h.classList.remove('active');
                 }
             });
-
-            // 更新 Content
             document.querySelectorAll('.pivot-content').forEach(c => {
                 c.classList.remove('active');
-                if(c.id === targetId) {
-                    c.classList.add('active');
-                }
+                if(c.id === targetId) c.classList.add('active');
             });
         }
 
-        // --- 渲染函數 ---
+        // --- GPS 與距離運算 ---
+        
+        // Haversine 公式：計算兩點經緯度的直線距離 (回傳單位：公里)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 地球半徑 (公里)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
 
-        // 渲染主頁儀表板數字
+        // 獲取使用者位置
+        function getUserLocation() {
+            const statusElements = document.querySelectorAll('.location-status');
+
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const userLat = position.coords.latitude;
+                        const userLng = position.coords.longitude;
+                        
+                        // 計算並更新陣列距離
+                        updateArrayDistances(userLat, userLng);
+                        
+                        // 更改狀態文字
+                        statusElements.forEach(el => el.innerText = "距離已按定位更新");
+                    },
+                    (error) => {
+                        console.warn('GPS 授權失敗或無法取得位置:', error);
+                        statusElements.forEach(el => el.innerText = "無法獲取定位，顯示預設資料");
+                        fallbackMockDistances();
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                );
+            } else {
+                statusElements.forEach(el => el.innerText = "瀏覽器不支援定位");
+                fallbackMockDistances();
+            }
+        }
+
+        // 計算距離並排序
+        function updateArrayDistances(userLat, userLng) {
+            // 計算 EV
+            mockEvStations.forEach(station => {
+                station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
+                station.distance = station.rawDistance.toFixed(1) + " km";
+            });
+            mockEvStations.sort((a, b) => a.rawDistance - b.rawDistance);
+
+            // 計算 Parking
+            mockParkingStations.forEach(station => {
+                station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
+                station.distance = station.rawDistance.toFixed(1) + " km";
+            });
+            mockParkingStations.sort((a, b) => a.rawDistance - b.rawDistance);
+
+            // 重新渲染排序後的列表
+            renderEvStations();
+            renderParkingStations();
+        }
+
+        // 如果無法獲取定位的降級處理 (套用假的距離數字以便預覽)
+        function fallbackMockDistances() {
+            mockEvStations[0].distance = "0.8 km"; mockEvStations[1].distance = "1.2 km"; 
+            mockEvStations[2].distance = "2.5 km"; mockEvStations[3].distance = "1.0 km";
+            
+            mockParkingStations[0].distance = "0.5 km"; mockParkingStations[1].distance = "1.0 km";
+            mockParkingStations[2].distance = "1.5 km"; mockParkingStations[3].distance = "1.2 km";
+            
+            renderEvStations();
+            renderParkingStations();
+        }
+
+        // --- 渲染函數 ---
+        
         function updateDashboard() {
             let totalParkAvail = 0;
             mockParkingStations.forEach(p => totalParkAvail += p.available);
             document.getElementById('dash-parking-total').innerText = totalParkAvail;
 
-            let totalFastAvail = 0;
-            let totalMidAvail = 0;
+            let totalFastAvail = 0; let totalMidAvail = 0;
             mockEvStations.forEach(ev => {
                 if (ev.status !== 'offline') {
-                    totalFastAvail += ev.fast.available;
-                    totalMidAvail += ev.medium.available;
+                    totalFastAvail += ev.fast.available; totalMidAvail += ev.medium.available;
                 }
             });
             document.getElementById('dash-ev-fast').innerText = totalFastAvail;
             document.getElementById('dash-ev-mid').innerText = totalMidAvail;
         }
 
-        // 渲染停車場列表
         function renderParkingStations() {
             const listEl = document.getElementById('parking-list');
             listEl.innerHTML = '';
-
             mockParkingStations.forEach(park => {
                 let statusClass = 'status-good';
                 if (park.available === 0) statusClass = 'status-full';
                 else if (park.available < 20) statusClass = 'status-warning';
 
-                const html = `
+                listEl.innerHTML += `
                     <div class="park-item ${statusClass}">
                         <div class="park-info">
                             <div class="park-title">${park.name}</div>
@@ -396,11 +459,9 @@
                         </div>
                     </div>
                 `;
-                listEl.innerHTML += html;
             });
         }
 
-        // 渲染充電站列表 (判斷可用數量的顏色)
         function getAvailabilityClass(available, total) {
             if (total === 0) return '';
             if (available === 0) return 'available-none';
@@ -411,13 +472,12 @@
         function renderEvStations() {
             const evListEl = document.getElementById('ev-list');
             evListEl.innerHTML = '';
-
             mockEvStations.forEach(station => {
                 const isOffline = station.status === 'offline';
                 const fastClass = getAvailabilityClass(station.fast.available, station.fast.total);
                 const mediumClass = getAvailabilityClass(station.medium.available, station.medium.total);
 
-                const html = `
+                evListEl.innerHTML += `
                     <div class="ev-item ${isOffline ? 'offline' : ''}">
                         <div class="ev-header">
                             <div class="ev-title">${station.name}</div>
@@ -440,7 +500,6 @@
                         </div>
                     </div>
                 `;
-                evListEl.innerHTML += html;
             });
         }
     </script>
