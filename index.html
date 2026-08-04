@@ -100,7 +100,7 @@
             text-transform: lowercase;
         }
 
-        /* 主頁動態磚 (Live Tiles) */
+        /* 主頁動態磚 */
         .tile-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -139,13 +139,12 @@
             line-height: 1;
         }
 
-        /* 顏色定義 */
         .bg-blue { background-color: #1ba1e2; }
         .bg-green { background-color: #60a917; }
         .bg-orange { background-color: #fa6800; }
         .bg-teal { background-color: #00aba9; }
 
-        /* 停車場列表項目 (Parking Tile) */
+        /* 停車場列表項目 */
         .park-item {
             background-color: #1a1a1a;
             margin-bottom: 15px;
@@ -160,47 +159,18 @@
         .park-item.status-warning { border-left-color: #fa6800; }
         .park-item.status-full { border-left-color: #ce352c; opacity: 0.6; }
 
-        .park-info { flex: 1; }
-        
-        .park-title {
-            font-size: 22px;
-            font-weight: 400;
-            margin-bottom: 4px;
-        }
+        .park-info { flex: 1; padding-right: 10px; }
+        .park-title { font-size: 22px; font-weight: 400; margin-bottom: 4px; line-height: 1.2; }
+        .park-address { font-size: 13px; color: #aaa; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .park-distance { font-size: 14px; color: #1ba1e2; font-weight: 600; }
 
-        .park-address {
-            font-size: 13px;
-            color: #aaa;
-            margin-bottom: 4px;
-        }
-
-        .park-distance {
-            font-size: 14px;
-            color: #1ba1e2; 
-            font-weight: 600;
-        }
-
-        .park-numbers {
-            text-align: right;
-            min-width: 70px;
-        }
-
-        .park-available {
-            font-size: 42px;
-            font-weight: 300;
-            line-height: 1;
-        }
-
+        .park-numbers { text-align: right; min-width: 70px; }
+        .park-available { font-size: 42px; font-weight: 300; line-height: 1; }
         .park-item.status-full .park-available { color: #ce352c; }
         .park-item.status-warning .park-available { color: #fa6800; }
-        
-        .park-total {
-            font-size: 12px;
-            color: #888;
-            margin-top: 4px;
-        }
+        .park-total { font-size: 12px; color: #888; margin-top: 4px; }
 
-        /* 充電站列表項目 (EV Tile) */
+        /* 充電站列表項目 */
         .ev-item {
             background-color: #1a1a1a;
             margin-bottom: 15px;
@@ -241,21 +211,19 @@
 <body>
 
     <div class="app-container">
-        <!-- Pivot Headers -->
         <div class="pivot-container" id="pivot-headers">
             <span class="pivot-header active" data-target="home">home</span>
             <span class="pivot-header" data-target="parking">parking</span>
             <span class="pivot-header" data-target="ev">ev charge</span>
         </div>
 
-        <!-- Home Page -->
         <div class="pivot-content active" id="home">
             <div class="status-bar">
                 <span class="status-text location-status">等待授權定位...</span>
             </div>
             <div class="tile-grid">
                 <div class="tile wide bg-blue" onclick="navigateTo('parking')">
-                    <div class="tile-title">附近空餘車位</div>
+                    <div class="tile-title">附近即時空車位</div>
                     <div class="tile-value" id="dash-parking-total">--</div>
                 </div>
                 <div class="tile bg-green" onclick="navigateTo('ev')">
@@ -267,13 +235,12 @@
                     <div class="tile-value" id="dash-ev-mid">--</div>
                 </div>
                 <div class="tile bg-orange">
-                    <div class="tile-title">系統狀態</div>
-                    <div class="tile-value" style="font-size: 32px; margin-top: 20px;">良好</div>
+                    <div class="tile-title">API 連線</div>
+                    <div class="tile-value" id="dash-api-status" style="font-size: 28px; margin-top: 20px;">連線中</div>
                 </div>
             </div>
         </div>
 
-        <!-- Parking Page -->
         <div class="pivot-content" id="parking">
             <div class="status-bar">
                 <span class="status-text location-status">計算距離中...</span>
@@ -281,7 +248,6 @@
             <div id="parking-list"></div>
         </div>
 
-        <!-- EV Charge Page -->
         <div class="pivot-content" id="ev">
             <div class="status-bar">
                 <span class="status-text location-status">計算距離中...</span>
@@ -292,35 +258,22 @@
     </div>
 
     <script>
-        // --- 模擬數據 (已補上真實經緯度) ---
-        let mockEvStations = [
+        // EV 數據目前保留模擬 (因香港 EV 實時數據分散在各營辦商)
+        let evStations = [
             { id: "ev_001", name: "領展 - 祥華商場", address: "粉嶺新運路38號", lat: 22.4918, lng: 114.1430, distance: "等待定位...", status: "online", fast: { total: 3, available: 2 }, medium: { total: 5, available: 0 } },
             { id: "ev_002", name: "海聯廣場", address: "粉嶺聯和墟和睦路9號", lat: 22.4990, lng: 114.1470, distance: "等待定位...", status: "online", fast: { total: 2, available: 0 }, medium: { total: 4, available: 1 } },
             { id: "ev_003", name: "Tesla 超充 - 上水匯", address: "上水石湖墟龍琛路48號", lat: 22.5033, lng: 114.1273, distance: "等待定位...", status: "online", fast: { total: 6, available: 5 }, medium: { total: 0, available: 0 } },
             { id: "ev_004", name: "粉嶺中心 (維護中)", address: "粉嶺新運路33號", lat: 22.4925, lng: 114.1400, distance: "等待定位...", status: "offline", fast: { total: 2, available: 0 }, medium: { total: 2, available: 0 } }
         ];
 
-        let mockParkingStations = [
-            { id: "p_001", name: "上水匯停車場", address: "上水石湖墟龍琛路48號", lat: 22.5033, lng: 114.1273, distance: "等待定位...", total: 150, available: 42 },
-            { id: "p_002", name: "粉嶺中心停車場", address: "粉嶺新運路33號", lat: 22.4925, lng: 114.1400, distance: "等待定位...", total: 200, available: 12 },
-            { id: "p_003", name: "聯和墟市政大廈", address: "粉嶺和滿街9號", lat: 22.4975, lng: 114.1458, distance: "等待定位...", total: 80, available: 0 },
-            { id: "p_004", name: "海聯廣場停車場", address: "粉嶺聯和墟和睦路9號", lat: 22.4990, lng: 114.1470, distance: "等待定位...", total: 120, available: 65 }
-        ];
+        // 停車場數據將由政府 API 動態填入
+        let parkingStations = []; 
 
-        // --- 初始化邏輯 ---
         document.addEventListener('DOMContentLoaded', () => {
             initPivot();
-            updateDashboard();
-            
-            // 先渲染一次骨架與假資料
-            renderEvStations();
-            renderParkingStations();
-            
-            // 嘗試獲取 GPS 定位
-            getUserLocation();
+            fetchGovParkingData(); // 啟動時先抓取政府 API 數據
         });
 
-        // --- 導覽切換 ---
         function initPivot() {
             const headers = document.querySelectorAll('.pivot-header');
             headers.forEach(header => {
@@ -345,11 +298,68 @@
             });
         }
 
-        // --- GPS 與距離運算 ---
-        
-        // Haversine 公式：計算兩點經緯度的直線距離 (回傳單位：公里)
+        // ==========================================
+        // 核心邏輯：串接香港資料一線通 API
+        // ==========================================
+        async function fetchGovParkingData() {
+            try {
+                updateStatusText("正在下載全港即時數據...");
+
+                // 同時請求停車場基本資料 (info) 與空車位資料 (vacancy)
+                const [infoRes, vacRes] = await Promise.all([
+                    fetch('https://api.data.gov.hk/v1/carpark-info-vacancy?data=info'),
+                    fetch('https://api.data.gov.hk/v1/carpark-info-vacancy?data=vacancy')
+                ]);
+
+                const infoData = await infoRes.json();
+                const vacData = await vacRes.json();
+
+                // 建立空車位的快速搜尋字典 (以 park_Id 為 Key)
+                const vacMap = {};
+                vacData.results.forEach(v => {
+                    let available = -1;
+                    if (v.vehicleTypes && v.vehicleTypes.length > 0) {
+                        // 優先尋找私家車 (privateCar) 的空車位，否則取第一個
+                        const pc = v.vehicleTypes.find(t => t.type === 'privateCar' || t.type === 'Private Car');
+                        available = pc ? pc.vacancy : v.vehicleTypes[0].vacancy;
+                    }
+                    vacMap[v.park_Id] = available;
+                });
+
+                // 將數據合併並清洗
+                parkingStations = infoData.results.map(p => {
+                    return {
+                        id: p.park_Id,
+                        name: p.name || '政府停車場',
+                        address: p.displayAddress || p.address || '',
+                        lat: parseFloat(p.latitude),
+                        lng: parseFloat(p.longitude),
+                        distance: "計算中...",
+                        rawDistance: 9999,
+                        available: vacMap[p.park_Id] !== undefined ? vacMap[p.park_Id] : -1,
+                        total: null // 政府即時 API 較少提供實時總車位，UI 會隱藏總數
+                    };
+                }).filter(p => p.available >= 0 && !isNaN(p.lat) && !isNaN(p.lng)); // 只保留有坐標且有空位數據的停車場
+
+                document.getElementById('dash-api-status').innerText = "正常";
+                document.getElementById('dash-api-status').style.color = "#ffffff";
+
+                // 數據準備好後，開始取得 GPS 並計算排序
+                getUserLocation();
+
+            } catch (error) {
+                console.error("API 串接失敗:", error);
+                document.getElementById('dash-api-status').innerText = "連線失敗";
+                document.getElementById('dash-api-status').style.color = "#ce352c";
+                updateStatusText("API 錯誤，請重新整理");
+            }
+        }
+
+        // ==========================================
+        // GPS 與距離計算 (Haversine 公式)
+        // ==========================================
         function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; // 地球半徑 (公里)
+            const R = 6371; 
             const dLat = (lat2 - lat1) * Math.PI / 180;
             const dLon = (lon2 - lon1) * Math.PI / 180;
             const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -359,77 +369,64 @@
             return R * c;
         }
 
-        // 獲取使用者位置
         function getUserLocation() {
-            const statusElements = document.querySelectorAll('.location-status');
-
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const userLat = position.coords.latitude;
                         const userLng = position.coords.longitude;
-                        
-                        // 計算並更新陣列距離
                         updateArrayDistances(userLat, userLng);
-                        
-                        // 更改狀態文字
-                        statusElements.forEach(el => el.innerText = "距離已按定位更新");
+                        updateStatusText("已定位，顯示附近資料");
                     },
                     (error) => {
-                        console.warn('GPS 授權失敗或無法取得位置:', error);
-                        statusElements.forEach(el => el.innerText = "無法獲取定位，顯示預設資料");
-                        fallbackMockDistances();
+                        console.warn('GPS 失敗:', error);
+                        // 若無 GPS，預設用九龍塘站的坐標作中心點示範
+                        updateArrayDistances(22.337, 114.175); 
+                        updateStatusText("未授權定位，以九龍塘為中心");
                     },
                     { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
                 );
             } else {
-                statusElements.forEach(el => el.innerText = "瀏覽器不支援定位");
-                fallbackMockDistances();
+                updateStatusText("瀏覽器不支援定位");
             }
         }
 
-        // 計算距離並排序
+        function updateStatusText(text) {
+            document.querySelectorAll('.location-status').forEach(el => el.innerText = text);
+        }
+
         function updateArrayDistances(userLat, userLng) {
-            // 計算 EV
-            mockEvStations.forEach(station => {
+            // EV 距離
+            evStations.forEach(station => {
                 station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
                 station.distance = station.rawDistance.toFixed(1) + " km";
             });
-            mockEvStations.sort((a, b) => a.rawDistance - b.rawDistance);
+            evStations.sort((a, b) => a.rawDistance - b.rawDistance);
 
-            // 計算 Parking
-            mockParkingStations.forEach(station => {
+            // Parking 距離
+            parkingStations.forEach(station => {
                 station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
                 station.distance = station.rawDistance.toFixed(1) + " km";
             });
-            mockParkingStations.sort((a, b) => a.rawDistance - b.rawDistance);
+            parkingStations.sort((a, b) => a.rawDistance - b.rawDistance);
 
-            // 重新渲染排序後的列表
             renderEvStations();
             renderParkingStations();
+            updateDashboard();
         }
 
-        // 如果無法獲取定位的降級處理 (套用假的距離數字以便預覽)
-        function fallbackMockDistances() {
-            mockEvStations[0].distance = "0.8 km"; mockEvStations[1].distance = "1.2 km"; 
-            mockEvStations[2].distance = "2.5 km"; mockEvStations[3].distance = "1.0 km";
-            
-            mockParkingStations[0].distance = "0.5 km"; mockParkingStations[1].distance = "1.0 km";
-            mockParkingStations[2].distance = "1.5 km"; mockParkingStations[3].distance = "1.2 km";
-            
-            renderEvStations();
-            renderParkingStations();
-        }
-
-        // --- 渲染函數 ---
-        
+        // ==========================================
+        // 渲染 UI
+        // ==========================================
         function updateDashboard() {
+            // 只加總距離你最近的 15 個停車場的空車位，避免數字過大失去參考意義
+            const nearestParkings = parkingStations.slice(0, 15);
             let totalParkAvail = 0;
-            mockParkingStations.forEach(p => totalParkAvail += p.available);
+            nearestParkings.forEach(p => totalParkAvail += p.available);
             document.getElementById('dash-parking-total').innerText = totalParkAvail;
 
             let totalFastAvail = 0; let totalMidAvail = 0;
-            mockEvStations.forEach(ev => {
+            evStations.forEach(ev => {
                 if (ev.status !== 'offline') {
                     totalFastAvail += ev.fast.available; totalMidAvail += ev.medium.available;
                 }
@@ -441,10 +438,16 @@
         function renderParkingStations() {
             const listEl = document.getElementById('parking-list');
             listEl.innerHTML = '';
-            mockParkingStations.forEach(park => {
+            
+            // 全港有幾百個停車場，為保持介面流暢，只渲染距離最近的 15 個
+            const nearestParkings = parkingStations.slice(0, 15);
+
+            nearestParkings.forEach(park => {
                 let statusClass = 'status-good';
                 if (park.available === 0) statusClass = 'status-full';
-                else if (park.available < 20) statusClass = 'status-warning';
+                else if (park.available < 15) statusClass = 'status-warning';
+
+                const totalStr = park.total ? `/ ${park.total} 位` : '車位';
 
                 listEl.innerHTML += `
                     <div class="park-item ${statusClass}">
@@ -455,27 +458,20 @@
                         </div>
                         <div class="park-numbers">
                             <div class="park-available">${park.available}</div>
-                            <div class="park-total">/ ${park.total} 位</div>
+                            <div class="park-total">${totalStr}</div>
                         </div>
                     </div>
                 `;
             });
         }
 
-        function getAvailabilityClass(available, total) {
-            if (total === 0) return '';
-            if (available === 0) return 'available-none';
-            if (available <= 1) return 'available-low';
-            return 'available-high';
-        }
-
         function renderEvStations() {
             const evListEl = document.getElementById('ev-list');
             evListEl.innerHTML = '';
-            mockEvStations.forEach(station => {
+            evStations.forEach(station => {
                 const isOffline = station.status === 'offline';
-                const fastClass = getAvailabilityClass(station.fast.available, station.fast.total);
-                const mediumClass = getAvailabilityClass(station.medium.available, station.medium.total);
+                const fastClass = (station.fast.total === 0) ? '' : (station.fast.available === 0 ? 'available-none' : (station.fast.available <= 1 ? 'available-low' : 'available-high'));
+                const mediumClass = (station.medium.total === 0) ? '' : (station.medium.available === 0 ? 'available-none' : (station.medium.available <= 1 ? 'available-low' : 'available-high'));
 
                 evListEl.innerHTML += `
                     <div class="ev-item ${isOffline ? 'offline' : ''}">
