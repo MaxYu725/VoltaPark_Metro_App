@@ -112,7 +112,7 @@
             z-index: 10;
             width: 36px;
             height: 36px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(0, 0, 0, 0.75);
             border: 1px solid #555;
             color: #fa6800;
             display: flex;
@@ -120,11 +120,12 @@
             justify-content: center;
             cursor: pointer;
             font-size: 18px;
+            border-radius: 4px;
         }
 
         /* 半徑滑桿 Metro 風格 */
         .radius-control {
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .radius-header {
@@ -176,19 +177,82 @@
             margin-top: 5px;
         }
 
-        /* Nearby 簡約列表項目 */
+        /* 地圖精細標籤樣式 (解決阻擋地圖問題) */
+        .park-marker-container {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .park-marker-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #1ba1e2;
+            border: 1px solid #ffffff;
+            border-radius: 50%;
+            flex-shrink: 0;
+            transition: all 0.3s ease;
+        }
+
+        .park-marker-badge {
+            font-size: 11px;
+            font-weight: 600;
+            color: #ffffff;
+            background: rgba(0, 0, 0, 0.75);
+            padding: 1px 4px;
+            border-radius: 3px;
+            white-space: nowrap;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        /* 地圖標籤高亮選中狀態 */
+        .park-marker-container.active .park-marker-dot {
+            background-color: #fa6800;
+            transform: scale(1.6);
+            border-color: #ffffff;
+            box-shadow: 0 0 8px #fa6800;
+        }
+
+        .park-marker-container.active .park-marker-badge {
+            color: #fa6800;
+            border-color: #fa6800;
+            background: rgba(0, 0, 0, 0.95);
+        }
+
+        /* 倒地使用者位置標籤 */
+        .user-marker {
+            width: 12px;
+            height: 12px;
+            background: #fa6800;
+            border: 2px solid #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(250, 104, 0, 0.8);
+        }
+
+        /* Nearby 列表項目與高亮效果 */
         .nearby-item {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            padding: 12px 10px;
             border-bottom: 1px solid #222;
+            border-left: 4px solid transparent;
+            cursor: pointer;
+            transition: background-color 0.3s ease, border-left-color 0.3s ease, transform 0.2s ease;
+        }
+
+        .nearby-item.active {
+            background-color: rgba(250, 104, 0, 0.15);
+            border-left-color: #fa6800;
         }
 
         .nearby-dist {
-            font-size: 16px;
+            font-size: 15px;
             color: #fa6800;
-            min-width: 75px;
+            min-width: 70px;
             font-weight: 400;
         }
 
@@ -220,24 +284,6 @@
             font-weight: 300;
             min-width: 45px;
             text-align: right;
-        }
-
-        /* 地圖 自訂標籤 樣式 */
-        .user-marker {
-            width: 16px;
-            height: 16px;
-            background: #fa6800;
-            border: 2px solid #fff;
-            border-radius: 50%;
-            box-shadow: 0 0 10px rgba(250, 104, 0, 0.8);
-        }
-
-        .park-marker {
-            width: 10px;
-            height: 10px;
-            background: #1ba1e2;
-            border-radius: 50%;
-            border: 1px solid #fff;
         }
 
         /* 主頁動態磚 */
@@ -333,10 +379,6 @@
             border-left: 6px solid #60a917;
         }
 
-        .ev-item.offline { border-left-color: #555555; }
-        .ev-item.offline .ev-title { color: #888888; }
-        .ev-item.offline .ev-distance { color: #555555; }
-
         .ev-header { padding: 15px 15px 10px 15px; }
         .ev-title { font-size: 24px; font-weight: 400; margin-bottom: 4px; }
         .ev-address { font-size: 13px; color: #aaaaaa; margin-bottom: 4px; }
@@ -349,9 +391,6 @@
         .charger-data span { font-size: 28px; font-weight: 300; color: #ffffff; margin-right: 2px; }
 
         .available-high span { color: #60a917; }
-        .available-low span { color: #fa6800; }
-        .available-none span { color: #ce352c; }
-
         .loading-text { color: #888; font-size: 18px; margin-top: 20px; text-align: center; }
     </style>
 </head>
@@ -460,8 +499,9 @@
         let lastPosition = null;
         let map = null;
         let userMarker = null;
-        let mapMarkers = [];
-        let currentRadius = 5.0; // 預設 5 公里
+        let mapMarkersMap = new Map(); // 儲存 parkId -> maplibregl.Marker
+        let currentRadius = 5.0; 
+        let selectedParkId = null; // 當前選中的停車場 ID
 
         const BASIC_URL = "https://resource.data.one.gov.hk/td/carpark/basic_info_all.json";
         const VACANCY_URL = "https://resource.data.one.gov.hk/td/carpark/vacancy_all.json";
@@ -496,7 +536,6 @@
                 if(c.id === targetId) c.classList.add('active');
             });
 
-            // 若切換至地圖頁面，觸發地圖重繪大小
             if (targetId === 'nearby' && map) {
                 setTimeout(() => map.resize(), 100);
             }
@@ -507,7 +546,7 @@
             map = new maplibregl.Map({
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
-                center: [114.2140, 22.3235], // 預設九龍灣
+                center: [114.2140, 22.3235],
                 zoom: 13
             });
         }
@@ -516,7 +555,8 @@
             if (lastPosition && map) {
                 map.flyTo({
                     center: [lastPosition.coords.longitude, lastPosition.coords.latitude],
-                    zoom: 14
+                    zoom: 14,
+                    speed: 1.2
                 });
             }
         }
@@ -532,7 +572,6 @@
             });
         }
 
-        // 計算距離 (Haversine)
         function distanceKm(lat1, lon1, lat2, lon2) {
             const toRad = value => value * Math.PI / 180;
             const earthRadiusKm = 6371;
@@ -571,7 +610,7 @@
                 const vacancyRecord = vacancyMap.get(info.park_id);
                 const vacancy = findPrivateCarVacancy(vacancyRecord);
                 return {
-                    id: info.park_id,
+                    id: String(info.park_id).trim(),
                     name: info.name_tc || info.name_en || "未命名停車場",
                     address: info.displayAddress_tc || info.displayaddress_tc || info.displayAddress_en || info.displayaddress_en || "地址未提供",
                     latitude: Number(info.latitude),
@@ -617,13 +656,12 @@
                     const uLat = lastPosition.coords.latitude;
                     const uLng = lastPosition.coords.longitude;
                     
-                    // 地圖設定定位標籤
                     if (map) {
                         map.setCenter([uLng, uLat]);
                         if (userMarker) userMarker.remove();
                         const el = document.createElement('div');
                         el.className = 'user-marker';
-                        userMarker = new maplibregl.Marker(el).setLngLat([uLng, uLat]).addTo(map);
+                        userMarker = new maplibregl.Marker({ element: el }).setLngLat([uLng, uLat]).addTo(map);
                     }
 
                     processDataWithLocation(uLat, uLng);
@@ -660,16 +698,53 @@
             updateDashboard();
         }
 
-        // 渲染 Nearby 頁面 (包含清單過濾與地圖 Marker 更新)
+        // 雙向互動核心：選中特定停車場（地圖飛行 + 列表平滑置中高亮）
+        function selectCarpark(parkId) {
+            selectedParkId = parkId;
+            const park = parkingStations.find(p => p.id === parkId);
+            if (!park) return;
+
+            // 1. 地圖平滑飛行至該座標並放大
+            if (map) {
+                map.flyTo({
+                    center: [park.longitude, park.latitude],
+                    zoom: 16,
+                    speed: 1.2,
+                    curve: 1.4
+                });
+            }
+
+            // 2. 更新地圖標籤高亮狀態
+            mapMarkersMap.forEach((marker, id) => {
+                const el = marker.getElement();
+                if (id === parkId) {
+                    el.classList.add('active');
+                } else {
+                    el.classList.remove('active');
+                }
+            });
+
+            // 3. 更新列表項目高亮狀態並平滑置中
+            const listItems = document.querySelectorAll('.nearby-item');
+            listItems.forEach(item => {
+                if (item.dataset.id === parkId) {
+                    item.classList.add('active');
+                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                } else {
+                    item.classList.remove('active');
+                }
+            });
+        }
+
+        // 渲染 Nearby 頁面 (解決巨型圖案問題，使用細小藍點 + 車位數字標籤)
         function renderNearbyPage() {
             const listEl = document.getElementById('nearby-list');
             listEl.innerHTML = '';
 
             // 清除現有地圖標記
-            mapMarkers.forEach(m => m.remove());
-            mapMarkers = [];
+            mapMarkersMap.forEach(m => m.remove());
+            mapMarkersMap.clear();
 
-            // 依半徑篩選資料
             const filtered = parkingStations.filter(p => p.rawDistance <= currentRadius);
 
             if (filtered.length === 0) {
@@ -680,29 +755,50 @@
             filtered.forEach(park => {
                 const vacancyInfo = formatVacancy(park.vacancyType, park.vacancy);
                 
-                // 新增地圖 Marker
+                // 正確建立細小藍點 + 數字標籤 Custom DOM Marker
                 if (map) {
-                    const el = document.createElement('div');
-                    el.className = 'park-marker';
-                    const marker = new maplibregl.Marker(el)
+                    const container = document.createElement('div');
+                    container.className = `park-marker-container ${selectedParkId === park.id ? 'active' : ''}`;
+                    container.dataset.id = park.id;
+                    container.innerHTML = `
+                        <div class="park-marker-dot"></div>
+                        <div class="park-marker-badge">${vacancyInfo.text}</div>
+                    `;
+
+                    // 點擊地圖藍點觸發連動
+                    container.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        selectCarpark(park.id);
+                    });
+
+                    // 使用選項物件傳入 element，確保不產生預設大藍水滴
+                    const marker = new maplibregl.Marker({ element: container, anchor: 'left' })
                         .setLngLat([park.longitude, park.latitude])
                         .addTo(map);
-                    mapMarkers.push(marker);
+
+                    mapMarkersMap.set(park.id, marker);
                 }
 
-                // 新增列表項目
-                listEl.innerHTML += `
-                    <div class="nearby-item">
-                        <div class="nearby-dist">${park.distanceDisplay}</div>
-                        <div class="nearby-info">
-                            <div class="nearby-name">${park.name}</div>
-                            <div class="nearby-addr">${park.address}</div>
-                        </div>
-                        <div class="nearby-val" style="${vacancyInfo.cssClass === 'full' ? 'color:#ce352c;' : ''}">
-                            ${vacancyInfo.text}
-                        </div>
+                // 建立列表項目（點擊列表項目觸發連動）
+                const itemEl = document.createElement('div');
+                itemEl.className = `nearby-item ${selectedParkId === park.id ? 'active' : ''}`;
+                itemEl.dataset.id = park.id;
+                itemEl.innerHTML = `
+                    <div class="nearby-dist">${park.distanceDisplay}</div>
+                    <div class="nearby-info">
+                        <div class="nearby-name">${park.name}</div>
+                        <div class="nearby-addr">${park.address}</div>
+                    </div>
+                    <div class="nearby-val" style="${vacancyInfo.cssClass === 'full' ? 'color:#ce352c;' : ''}">
+                        ${vacancyInfo.text}
                     </div>
                 `;
+
+                itemEl.addEventListener('click', () => {
+                    selectCarpark(park.id);
+                });
+
+                listEl.appendChild(itemEl);
             });
         }
 
