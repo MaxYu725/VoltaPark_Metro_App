@@ -283,7 +283,9 @@
                 <span class="distance">${distance.toFixed(2)} km</span>
               </div>
               <div class="address">
-                ${escapeHtml(info.displayaddress_tc || info.displayaddress_en || "地址未提供")}
+                ${escapeHtml(info.displayAddress_tc || info.displayaddress_tc ||
+                info.displayAddress_en || info.displayaddress_en ||
+                "地址未提供")}
               </div>
               <div class="stats">
                 <div class="stat">
