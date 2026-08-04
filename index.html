@@ -158,18 +158,20 @@
         .park-item.status-good { border-left-color: #60a917; }
         .park-item.status-warning { border-left-color: #fa6800; }
         .park-item.status-full { border-left-color: #ce352c; }
-        .park-item.status-unknown { border-left-color: #555555; opacity: 0.8; }
+        .park-item.status-unknown { border-left-color: #444444; opacity: 0.8; }
 
         .park-info { flex: 1; padding-right: 10px; }
         .park-title { font-size: 22px; font-weight: 400; margin-bottom: 4px; line-height: 1.2; }
         .park-address { font-size: 13px; color: #aaa; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
         .park-distance { font-size: 14px; color: #1ba1e2; font-weight: 600; }
 
-        .park-numbers { text-align: right; min-width: 70px; }
+        .park-numbers { text-align: right; min-width: 80px; }
         .park-available { font-size: 36px; font-weight: 300; line-height: 1; }
         .park-item.status-full .park-available { color: #ce352c; }
         .park-item.status-warning .park-available { color: #fa6800; }
-        .park-item.status-unknown .park-available { color: #888; font-size: 24px; }
+        
+        .park-item.status-unknown .park-available { color: #888; font-size: 18px; font-weight: 400; margin-bottom: 5px; }
+        
         .park-total { font-size: 12px; color: #888; margin-top: 4px; }
 
         /* 充電站列表項目 */
@@ -214,7 +216,6 @@
             margin-top: 20px;
             text-align: center;
         }
-
     </style>
 </head>
 <body>
@@ -311,47 +312,59 @@
         }
 
         // ==========================================
-        // 串接香港資料一線通 API
+        // 依照運輸署 Data Specification V1.9 更新的 API 串接邏輯
         // ==========================================
         async function fetchGovParkingData() {
             try {
                 updateStatusText("正在下載全港停車場資料...");
 
                 const [infoRes, vacRes] = await Promise.all([
-                    fetch('https://api.data.gov.hk/v1/carpark-info-vacancy?data=info'),
-                    fetch('https://api.data.gov.hk/v1/carpark-info-vacancy?data=vacancy')
+                    fetch('https://resource.data.one.gov.hk/td/carpark/basic_info_all.json'),
+                    fetch('https://resource.data.one.gov.hk/td/carpark/vacancy_all.json')
                 ]);
 
                 const infoData = await infoRes.json();
                 const vacData = await vacRes.json();
 
                 const vacMap = {};
-                if(vacData && vacData.results) {
-                    vacData.results.forEach(v => {
+                if(vacData && vacData.car_park) {
+                    vacData.car_park.forEach(cp => {
                         let available = -1;
-                        if (v.vehicleTypes && v.vehicleTypes.length > 0) {
-                            const pc = v.vehicleTypes.find(t => t.type === 'privateCar' || t.type === 'Private Car' || t.type === 'PrivateCar');
-                            if(pc && !isNaN(parseInt(pc.vacancy))) available = parseInt(pc.vacancy);
-                            else if(!isNaN(parseInt(v.vehicleTypes[0].vacancy))) available = parseInt(v.vehicleTypes[0].vacancy);
+                        
+                        // 根據規格書，尋找 vehicle_type 陣列中的 "P" (私家車)
+                        if (cp.vehicle_type && Array.isArray(cp.vehicle_type)) {
+                            const pType = cp.vehicle_type.find(v => v.type === 'P');
+                            
+                            if (pType && pType.service_category && Array.isArray(pType.service_category)) {
+                                // 預設抓取 HOURLY 空位，若無則抓第一個
+                                const svc = pType.service_category.find(s => s.category === 'HOURLY') || pType.service_category[0];
+                                if (svc && svc.vacancy !== undefined && svc.vacancy !== null) {
+                                    available = parseInt(svc.vacancy);
+                                }
+                            }
                         }
-                        vacMap[v.park_Id] = available;
+                        
+                        if (isNaN(available)) available = -1;
+                        vacMap[String(cp.park_id).trim()] = available;
                     });
                 }
 
-                if(infoData && infoData.results) {
-                    // 保留所有具備名稱與有效坐標的停車場（不再過濾車位數量）
-                    parkingStations = infoData.results.map(p => {
+                if(infoData && infoData.car_park) {
+                    parkingStations = infoData.car_park.map(p => {
                         const lat = parseFloat(p.latitude);
                         const lng = parseFloat(p.longitude);
+                        const idStr = String(p.park_id).trim();
+                        
                         return {
-                            id: p.park_Id,
-                            name: p.name || '政府停車場',
-                            address: p.displayAddress || p.address || '地址不詳',
+                            id: idStr,
+                            // 根據規格書，使用 name_tc 與 displayaddress_tc
+                            name: p.name_tc || p.name_en || '政府停車場',
+                            address: p.displayaddress_tc || p.displayaddress_en || '地址不詳',
                             lat: isNaN(lat) ? 0 : lat,
                             lng: isNaN(lng) ? 0 : lng,
                             distance: "計算中...",
                             rawDistance: 9999,
-                            available: vacMap[p.park_Id] !== undefined ? vacMap[p.park_Id] : -1,
+                            available: vacMap[idStr] !== undefined ? vacMap[idStr] : -1,
                             total: null
                         };
                     }).filter(p => p.lat !== 0); 
@@ -396,7 +409,6 @@
                     },
                     (error) => {
                         console.warn('GPS 失敗:', error);
-                        // 若未授權定位，不預設任何地區，直接顯示全港停車場（不按距離排序）
                         updateStatusText("未授權定位，顯示全港停車場");
                         renderParkingStations();
                         updateDashboardWithoutLocation();
@@ -432,7 +444,7 @@
         }
 
         // ==========================================
-        // 渲染 UI (確保所有停車場皆顯示)
+        // 渲染 UI
         // ==========================================
         function updateDashboard() {
             const nearestParkings = parkingStations.slice(0, 15);
@@ -469,19 +481,21 @@
                 return;
             }
 
-            // 顯示最近的 30 個停車場（確保即使車位為 0 或暫無數據也會顯示名稱與地址）
+            // 顯示最近的 30 個停車場
             const displayParkings = parkingStations.slice(0, 30);
 
             displayParkings.forEach(park => {
                 let statusClass = 'status-good';
                 let availText = park.available;
+                let totalText = '車位';
 
                 if (park.available === 0) {
                     statusClass = 'status-full';
                     availText = '0';
                 } else if (park.available < 0) {
                     statusClass = 'status-unknown';
-                    availText = '--'; // 暫無即時空位數據
+                    availText = '無數據'; 
+                    totalText = '未提供即時資訊';
                 } else if (park.available < 15) {
                     statusClass = 'status-warning';
                 }
@@ -495,7 +509,7 @@
                         </div>
                         <div class="park-numbers">
                             <div class="park-available">${availText}</div>
-                            <div class="park-total">車位</div>
+                            <div class="park-total">${totalText}</div>
                         </div>
                     </div>
                 `;
