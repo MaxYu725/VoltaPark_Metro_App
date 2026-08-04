@@ -1,554 +1,331 @@
-<!DOCTYPE html>
-<html lang="zh-HK">
+<!doctype html>
+<html lang="zh-Hant">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>VoltaPark</title>
-    <style>
-        /* 基礎 Metro UI 設定 */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-
-        body {
-            background-color: #000000;
-            color: #ffffff;
-            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
-            overflow-x: hidden;
-            display: flex;
-            justify-content: center;
-        }
-
-        .app-container {
-            width: 100%;
-            max-width: 480px;
-            min-height: 100vh;
-            background-color: #000000;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        /* 頂部導覽列 (Pivot Headers) */
-        .pivot-container {
-            padding: 30px 20px 10px 20px;
-            display: flex;
-            overflow-x: auto;
-            white-space: nowrap;
-            scrollbar-width: none;
-        }
-        .pivot-container::-webkit-scrollbar {
-            display: none;
-        }
-
-        .pivot-header {
-            font-size: 42px;
-            font-weight: 300;
-            color: #555555;
-            margin-right: 25px;
-            cursor: pointer;
-            transition: color 0.3s;
-            text-transform: lowercase;
-            letter-spacing: -1px;
-        }
-
-        .pivot-header.active {
-            color: #ffffff;
-        }
-
-        /* 頁面內容區 */
-        .pivot-content {
-            flex: 1;
-            padding: 0 20px 20px 20px;
-            overflow-y: auto;
-            display: none;
-            animation: fadeIn 0.3s ease-out;
-        }
-
-        .pivot-content.active {
-            display: block;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateX(15px); }
-            to { opacity: 1; transform: translateX(0); }
-        }
-
-        /* 頂部狀態列 */
-        .status-bar {
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #333;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .status-text {
-            font-size: 14px;
-            color: #888;
-            text-transform: lowercase;
-        }
-
-        .action-text {
-            font-size: 14px;
-            color: #60a917;
-            cursor: pointer;
-            text-transform: lowercase;
-        }
-
-        /* 主頁動態磚 */
-        .tile-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-
-        .tile {
-            aspect-ratio: 1;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            cursor: pointer;
-            transition: transform 0.1s;
-        }
-
-        .tile:active {
-            transform: scale(0.96);
-        }
-
-        .tile.wide {
-            grid-column: span 2;
-            aspect-ratio: 2.1 / 1;
-        }
-
-        .tile-title {
-            font-size: 16px;
-            font-weight: 400;
-            letter-spacing: 0.5px;
-        }
-
-        .tile-value {
-            font-size: 48px;
-            font-weight: 300;
-            text-align: right;
-            line-height: 1;
-        }
-
-        .bg-blue { background-color: #1ba1e2; }
-        .bg-green { background-color: #60a917; }
-        .bg-orange { background-color: #fa6800; }
-        .bg-teal { background-color: #00aba9; }
-
-        /* 停車場列表項目 */
-        .park-item {
-            background-color: #1a1a1a;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px;
-            border-left: 6px solid #555;
-        }
-
-        .park-item.status-good { border-left-color: #60a917; }
-        .park-item.status-warning { border-left-color: #fa6800; }
-        .park-item.status-full { border-left-color: #ce352c; }
-        .park-item.status-unknown { border-left-color: #444444; opacity: 0.8; }
-
-        .park-info { flex: 1; padding-right: 10px; }
-        .park-title { font-size: 22px; font-weight: 400; margin-bottom: 4px; line-height: 1.2; }
-        .park-address { font-size: 13px; color: #aaa; margin-bottom: 4px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-        .park-distance { font-size: 14px; color: #1ba1e2; font-weight: 600; }
-
-        .park-numbers { text-align: right; min-width: 80px; }
-        .park-available { font-size: 36px; font-weight: 300; line-height: 1; }
-        .park-item.status-full .park-available { color: #ce352c; }
-        .park-item.status-warning .park-available { color: #fa6800; }
-        
-        .park-item.status-unknown .park-available { color: #888; font-size: 18px; font-weight: 400; margin-bottom: 5px; }
-        
-        .park-total { font-size: 12px; color: #888; margin-top: 4px; }
-
-        /* 充電站列表項目 */
-        .ev-item {
-            background-color: #1a1a1a;
-            margin-bottom: 15px;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
-            border-left: 6px solid #60a917;
-        }
-
-        .ev-item.offline { border-left-color: #555555; }
-        .ev-item.offline .ev-title { color: #888888; }
-        .ev-item.offline .ev-distance { color: #555555; }
-
-        .ev-header { padding: 15px 15px 10px 15px; }
-        .ev-title { font-size: 24px; font-weight: 400; margin-bottom: 4px; }
-        .ev-address { font-size: 13px; color: #aaaaaa; margin-bottom: 4px; }
-        .ev-distance { font-size: 14px; color: #60a917; font-weight: 600; }
-
-        .ev-chargers {
-            display: flex;
-            background-color: #252525;
-            padding: 12px 15px;
-            justify-content: space-between;
-        }
-
-        .charger-type { display: flex; flex-direction: column; flex: 1; }
-        .charger-label { font-size: 12px; color: #888; margin-bottom: 2px; }
-        .charger-data { font-size: 14px; color: #ccc; }
-        .charger-data span { font-size: 28px; font-weight: 300; color: #ffffff; margin-right: 2px; }
-
-        .available-high span { color: #60a917; }
-        .available-low span { color: #fa6800; }
-        .available-none span { color: #ce352c; }
-
-        .loading-text {
-            color: #888;
-            font-size: 18px;
-            margin-top: 20px;
-            text-align: center;
-        }
-    </style>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <title>附近停車場空置車位</title>
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+        "PingFang HK", "Noto Sans TC", sans-serif;
+      color: #0f172a;
+      background: #f1f5f9;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header {
+      padding: 22px 16px 18px;
+      color: white;
+      background: #0f172a;
+    }
+    h1 { margin: 0 0 6px; font-size: 1.35rem; }
+    header p { margin: 0; color: #cbd5e1; font-size: .9rem; }
+    main { max-width: 780px; margin: auto; padding: 14px; }
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+    select, button {
+      min-height: 46px;
+      border: 0;
+      border-radius: 12px;
+      padding: 0 14px;
+      font: inherit;
+    }
+    select { background: white; border: 1px solid #cbd5e1; }
+    button {
+      color: white;
+      background: #2563eb;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .55; cursor: wait; }
+    #status {
+      margin: 8px 2px 14px;
+      color: #475569;
+      font-size: .92rem;
+    }
+    .card {
+      margin-bottom: 12px;
+      padding: 16px;
+      border-radius: 16px;
+      background: white;
+      box-shadow: 0 2px 10px rgb(15 23 42 / 7%);
+    }
+    .top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .name { margin: 0; font-size: 1.08rem; }
+    .distance {
+      flex: 0 0 auto;
+      border-radius: 999px;
+      padding: 5px 9px;
+      background: #e2e8f0;
+      color: #334155;
+      font-size: .8rem;
+      font-weight: 700;
+    }
+    .address {
+      margin: 7px 0 14px;
+      color: #64748b;
+      font-size: .9rem;
+      line-height: 1.45;
+    }
+    .stats {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat {
+      padding: 11px;
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+    .label { color: #64748b; font-size: .78rem; }
+    .value { margin-top: 3px; font-size: 1.12rem; font-weight: 800; }
+    .available { color: #15803d; }
+    .full { color: #dc2626; }
+    .unknown { color: #64748b; }
+    .meta {
+      margin-top: 10px;
+      color: #94a3b8;
+      font-size: .75rem;
+    }
+    .empty, .error {
+      padding: 22px 16px;
+      border-radius: 14px;
+      background: white;
+      text-align: center;
+      line-height: 1.6;
+    }
+    .error { color: #b91c1c; }
+    @media (max-width: 430px) {
+      .controls { grid-template-columns: 1fr; }
+      button { width: 100%; }
+    }
+  </style>
 </head>
 <body>
+  <header>
+    <h1>附近停車場空置車位</h1>
+    <p>使用你的目前位置，按距離排列香港停車場。</p>
+  </header>
 
-    <div class="app-container">
-        <div class="pivot-container" id="pivot-headers">
-            <span class="pivot-header active" data-target="home">home</span>
-            <span class="pivot-header" data-target="parking">parking</span>
-            <span class="pivot-header" data-target="ev">ev charge</span>
-        </div>
-
-        <div class="pivot-content active" id="home">
-            <div class="status-bar">
-                <span class="status-text location-status">等待授權定位...</span>
-            </div>
-            <div class="tile-grid">
-                <div class="tile wide bg-blue" onclick="navigateTo('parking')">
-                    <div class="tile-title">附近即時空車位</div>
-                    <div class="tile-value" id="dash-parking-total">--</div>
-                </div>
-                <div class="tile bg-green" onclick="navigateTo('ev')">
-                    <div class="tile-title">可用快充</div>
-                    <div class="tile-value" id="dash-ev-fast">--</div>
-                </div>
-                <div class="tile bg-teal" onclick="navigateTo('ev')">
-                    <div class="tile-title">可用中充</div>
-                    <div class="tile-value" id="dash-ev-mid">--</div>
-                </div>
-                <div class="tile bg-orange">
-                    <div class="tile-title">API 連線</div>
-                    <div class="tile-value" id="dash-api-status" style="font-size: 28px; margin-top: 20px;">連線中</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="pivot-content" id="parking">
-            <div class="status-bar">
-                <span class="status-text location-status">下載全港停車場資料中...</span>
-            </div>
-            <div id="parking-list">
-                <div class="loading-text">正在載入停車場清單...</div>
-            </div>
-        </div>
-
-        <div class="pivot-content" id="ev">
-            <div class="status-bar">
-                <span class="status-text location-status">計算距離中...</span>
-                <span class="action-text">篩選插頭類型</span>
-            </div>
-            <div id="ev-list">
-                <div class="loading-text">正在載入充電站資料...</div>
-            </div>
-        </div>
+  <main>
+    <div class="controls">
+      <select id="radius" aria-label="搜尋範圍">
+        <option value="1">1 公里內</option>
+        <option value="3" selected>3 公里內</option>
+        <option value="5">5 公里內</option>
+        <option value="10">10 公里內</option>
+        <option value="999">全部停車場</option>
+      </select>
+      <button id="locate">定位及更新</button>
     </div>
+    <div id="status">按「定位及更新」開始。</div>
+    <section id="results"></section>
+  </main>
 
-    <script>
-        let evStations = [
-            { id: "ev_001", name: "MegaBox (Tesla)", address: "九龍灣宏照道38號", lat: 22.3197, lng: 114.2081, distance: "等待定位...", status: "online", fast: { total: 6, available: 2 }, medium: { total: 10, available: 4 } },
-            { id: "ev_002", name: "E-Max (中電)", address: "九龍灣展貿徑1號", lat: 22.3242, lng: 114.2045, distance: "等待定位...", status: "online", fast: { total: 3, available: 0 }, medium: { total: 8, available: 1 } },
-            { id: "ev_003", name: "德福廣場一期", address: "九龍灣偉業街33號", lat: 22.3218, lng: 114.2133, distance: "等待定位...", status: "online", fast: { total: 2, available: 1 }, medium: { total: 0, available: 0 } },
-            { id: "ev_004", name: "領展 - 祥華商場", address: "粉嶺新運路38號", lat: 22.4918, lng: 114.1430, distance: "等待定位...", status: "online", fast: { total: 3, available: 2 }, medium: { total: 5, available: 0 } },
-            { id: "ev_005", name: "Tesla 超充 - 上水匯", address: "上水石湖墟龍琛路48號", lat: 22.5033, lng: 114.1273, distance: "等待定位...", status: "online", fast: { total: 6, available: 5 }, medium: { total: 0, available: 0 } }
-        ];
+  <script>
+    // 運輸署停車場資料
+    const BASIC_URL =
+      "https://resource.data.one.gov.hk/td/carpark/basic_info_all.json";
+    const VACANCY_URL =
+      "https://resource.data.one.gov.hk/td/carpark/vacancy_all.json";
 
-        let parkingStations = []; 
+    const $ = (s) => document.querySelector(s);
+    const button = $("#locate");
+    const statusBox = $("#status");
+    const results = $("#results");
 
-        document.addEventListener('DOMContentLoaded', () => {
-            initPivot();
-            fetchGovParkingData();
-        });
+    function escapeHtml(value = "") {
+      return String(value).replace(/[&<>"']/g, c => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;",
+        '"': "&quot;", "'": "&#039;"
+      })[c]);
+    }
 
-        function initPivot() {
-            const headers = document.querySelectorAll('.pivot-header');
-            headers.forEach(header => {
-                header.addEventListener('click', () => {
-                    navigateTo(header.getAttribute('data-target'));
-                });
-            });
+    function distanceKm(lat1, lon1, lat2, lon2) {
+      const toRad = d => d * Math.PI / 180;
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) ** 2 +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function findPrivateCarVacancy(carPark) {
+      const vehicle = (carPark?.vehicle_type || []).find(v => v.type === "P");
+      if (!vehicle) return null;
+
+      return (vehicle.service_category || []).find(s => s.category === "HOURLY")
+        || vehicle.service_category?.[0]
+        || null;
+    }
+
+    // 規格沒有定義「總車位」欄位；以下只在資料日後提供常見容量欄位時讀取。
+    function findCapacity(info, vacancy) {
+      const candidates = [
+        info.total_spaces, info.total_space, info.capacity,
+        info.total_parking_spaces, vacancy?.total_spaces, vacancy?.capacity
+      ];
+      const value = candidates.find(v => Number.isFinite(Number(v)) && Number(v) >= 0);
+      return value === undefined ? null : Number(value);
+    }
+
+    function vacancyDisplay(item) {
+      if (!item) return { text: "沒有資料", cls: "unknown" };
+
+      const type = item.vacancy_type;
+      const n = Number(item.vacancy);
+
+      if (type === "C") return { text: "停車場關閉", cls: "full" };
+      if (n === -1) return { text: "沒有資料", cls: "unknown" };
+
+      if (type === "A") {
+        return n === 0
+          ? { text: "已滿", cls: "full" }
+          : { text: `${n} 個`, cls: "available" };
+      }
+
+      if (type === "B") {
+        return n === 0
+          ? { text: "已滿", cls: "full" }
+          : { text: "有車位", cls: "available" };
+      }
+
+      return { text: "沒有資料", cls: "unknown" };
+    }
+
+    function getPosition() {
+      return new Promise((resolve, reject) => {
+        if (!navigator.geolocation) {
+          reject(new Error("此瀏覽器不支援定位。"));
+          return;
+        }
+        navigator.geolocation.getCurrentPosition(
+          resolve,
+          reject,
+          { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+        );
+      });
+    }
+
+    async function loadNearby() {
+      button.disabled = true;
+      results.innerHTML = "";
+      statusBox.textContent = "正在取得位置及停車場資料…";
+
+      try {
+        const [position, basicRes, vacancyRes] = await Promise.all([
+          getPosition(),
+          fetch(BASIC_URL, { cache: "no-store" }),
+          fetch(VACANCY_URL, { cache: "no-store" })
+        ]);
+
+        if (!basicRes.ok || !vacancyRes.ok) {
+          throw new Error("未能讀取運輸署 API。");
         }
 
-        function navigateTo(targetId) {
-            document.querySelectorAll('.pivot-header').forEach(h => {
-                if(h.getAttribute('data-target') === targetId) {
-                    h.classList.add('active');
-                    h.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-                } else {
-                    h.classList.remove('active');
-                }
-            });
-            document.querySelectorAll('.pivot-content').forEach(c => {
-                c.classList.remove('active');
-                if(c.id === targetId) c.classList.add('active');
-            });
+        const [basicData, vacancyData] = await Promise.all([
+          basicRes.json(),
+          vacancyRes.json()
+        ]);
+
+        const userLat = position.coords.latitude;
+        const userLon = position.coords.longitude;
+        const radius = Number($("#radius").value);
+
+        const vacancyMap = new Map(
+          (vacancyData.car_park || []).map(x => [x.park_id, x])
+        );
+
+        const nearby = (basicData.car_park || [])
+          .map(info => ({
+            info,
+            distance: distanceKm(
+              userLat, userLon,
+              Number(info.latitude), Number(info.longitude)
+            ),
+            vacancyRecord: vacancyMap.get(info.park_id)
+          }))
+          .filter(x => Number.isFinite(x.distance) && x.distance <= radius)
+          .sort((a, b) => a.distance - b.distance);
+
+        statusBox.textContent =
+          `定位準確度約 ${Math.round(position.coords.accuracy)} 米；找到 ${nearby.length} 個停車場。`;
+
+        if (!nearby.length) {
+          results.innerHTML =
+            '<div class="empty">搜尋範圍內沒有參與此 API 的停車場。</div>';
+          return;
         }
 
-        // ==========================================
-        // 依照運輸署 Data Specification V1.9 更新的 API 串接邏輯
-        // ==========================================
-        async function fetchGovParkingData() {
-            try {
-                updateStatusText("正在下載全港停車場資料...");
+        results.innerHTML = nearby.map(({ info, distance, vacancyRecord }) => {
+          const vacancy = findPrivateCarVacancy(vacancyRecord);
+          const available = vacancyDisplay(vacancy);
+          const capacity = findCapacity(info, vacancy);
+          const totalText = capacity === null ? "API 未提供" : `${capacity} 個`;
 
-                const [infoRes, vacRes] = await Promise.all([
-                    fetch('https://resource.data.one.gov.hk/td/carpark/basic_info_all.json'),
-                    fetch('https://resource.data.one.gov.hk/td/carpark/vacancy_all.json')
-                ]);
+          return `
+            <article class="card">
+              <div class="top">
+                <h2 class="name">${escapeHtml(info.name_tc || info.name_en)}</h2>
+                <span class="distance">${distance.toFixed(2)} km</span>
+              </div>
+              <div class="address">
+                ${escapeHtml(info.displayaddress_tc || info.displayaddress_en || "地址未提供")}
+              </div>
+              <div class="stats">
+                <div class="stat">
+                  <div class="label">總提供車位</div>
+                  <div class="value ${capacity === null ? "unknown" : ""}">
+                    ${totalText}
+                  </div>
+                </div>
+                <div class="stat">
+                  <div class="label">剩餘車位</div>
+                  <div class="value ${available.cls}">
+                    ${available.text}
+                  </div>
+                </div>
+              </div>
+              <div class="meta">
+                私家車／客貨車・時租
+                ${vacancy?.lastupdate ? `・更新：${escapeHtml(vacancy.lastupdate)}` : ""}
+              </div>
+            </article>`;
+        }).join("");
 
-                const infoData = await infoRes.json();
-                const vacData = await vacRes.json();
+      } catch (error) {
+        console.error(error);
+        let message = error.message || "發生錯誤。";
 
-                const vacMap = {};
-                if(vacData && vacData.car_park) {
-                    vacData.car_park.forEach(cp => {
-                        let available = -1;
-                        
-                        // 根據規格書，尋找 vehicle_type 陣列中的 "P" (私家車)
-                        if (cp.vehicle_type && Array.isArray(cp.vehicle_type)) {
-                            const pType = cp.vehicle_type.find(v => v.type === 'P');
-                            
-                            if (pType && pType.service_category && Array.isArray(pType.service_category)) {
-                                // 預設抓取 HOURLY 空位，若無則抓第一個
-                                const svc = pType.service_category.find(s => s.category === 'HOURLY') || pType.service_category[0];
-                                if (svc && svc.vacancy !== undefined && svc.vacancy !== null) {
-                                    available = parseInt(svc.vacancy);
-                                }
-                            }
-                        }
-                        
-                        if (isNaN(available)) available = -1;
-                        vacMap[String(cp.park_id).trim()] = available;
-                    });
-                }
+        if (error.code === 1) message = "定位權限被拒絕，請允許瀏覽器使用位置。";
+        if (error.code === 2) message = "暫時無法取得位置。";
+        if (error.code === 3) message = "取得位置逾時，請再試一次。";
 
-                if(infoData && infoData.car_park) {
-                    parkingStations = infoData.car_park.map(p => {
-                        const lat = parseFloat(p.latitude);
-                        const lng = parseFloat(p.longitude);
-                        const idStr = String(p.park_id).trim();
-                        
-                        return {
-                            id: idStr,
-                            // 根據規格書，使用 name_tc 與 displayaddress_tc
-                            name: p.name_tc || p.name_en || '政府停車場',
-                            address: p.displayaddress_tc || p.displayaddress_en || '地址不詳',
-                            lat: isNaN(lat) ? 0 : lat,
-                            lng: isNaN(lng) ? 0 : lng,
-                            distance: "計算中...",
-                            rawDistance: 9999,
-                            available: vacMap[idStr] !== undefined ? vacMap[idStr] : -1,
-                            total: null
-                        };
-                    }).filter(p => p.lat !== 0); 
-                }
+        results.innerHTML = `<div class="error">${escapeHtml(message)}</div>`;
+        statusBox.textContent =
+          "提示：定位功能需要以 HTTPS 網址或 localhost 開啟。";
+      } finally {
+        button.disabled = false;
+      }
+    }
 
-                document.getElementById('dash-api-status').innerText = "正常";
-                document.getElementById('dash-api-status').style.color = "#ffffff";
-
-                getUserLocation();
-
-            } catch (error) {
-                console.error("API 串接失敗:", error);
-                document.getElementById('dash-api-status').innerText = "連線失敗";
-                document.getElementById('dash-api-status').style.color = "#ce352c";
-                updateStatusText("API 錯誤");
-                document.getElementById('parking-list').innerHTML = '<div class="loading-text">無法連接政府開放數據</div>';
-            }
-        }
-
-        // ==========================================
-        // GPS 與距離計算
-        // ==========================================
-        function calculateDistance(lat1, lon1, lat2, lon2) {
-            const R = 6371; 
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                      Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            return R * c;
-        }
-
-        function getUserLocation() {
-            if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                    (position) => {
-                        const userLat = position.coords.latitude;
-                        const userLng = position.coords.longitude;
-                        updateArrayDistances(userLat, userLng);
-                        updateStatusText("已定位，顯示附近資料");
-                    },
-                    (error) => {
-                        console.warn('GPS 失敗:', error);
-                        updateStatusText("未授權定位，顯示全港停車場");
-                        renderParkingStations();
-                        updateDashboardWithoutLocation();
-                    },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-                );
-            } else {
-                updateStatusText("瀏覽器不支援定位");
-                renderParkingStations();
-            }
-        }
-
-        function updateStatusText(text) {
-            document.querySelectorAll('.location-status').forEach(el => el.innerText = text);
-        }
-
-        function updateArrayDistances(userLat, userLng) {
-            evStations.forEach(station => {
-                station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
-                station.distance = station.rawDistance.toFixed(1) + " km";
-            });
-            evStations.sort((a, b) => a.rawDistance - b.rawDistance);
-
-            parkingStations.forEach(station => {
-                station.rawDistance = calculateDistance(userLat, userLng, station.lat, station.lng);
-                station.distance = station.rawDistance.toFixed(1) + " km";
-            });
-            parkingStations.sort((a, b) => a.rawDistance - b.rawDistance);
-
-            renderEvStations();
-            renderParkingStations();
-            updateDashboard();
-        }
-
-        // ==========================================
-        // 渲染 UI
-        // ==========================================
-        function updateDashboard() {
-            const nearestParkings = parkingStations.slice(0, 15);
-            let totalParkAvail = 0;
-            nearestParkings.forEach(p => {
-                if(p.available > 0) totalParkAvail += p.available;
-            });
-            document.getElementById('dash-parking-total').innerText = totalParkAvail;
-
-            let totalFastAvail = 0; let totalMidAvail = 0;
-            evStations.forEach(ev => {
-                if (ev.status !== 'offline') {
-                    totalFastAvail += ev.fast.available; totalMidAvail += ev.medium.available;
-                }
-            });
-            document.getElementById('dash-ev-fast').innerText = totalFastAvail;
-            document.getElementById('dash-ev-mid').innerText = totalMidAvail;
-        }
-
-        function updateDashboardWithoutLocation() {
-            let totalParkAvail = 0;
-            parkingStations.forEach(p => {
-                if(p.available > 0) totalParkAvail += p.available;
-            });
-            document.getElementById('dash-parking-total').innerText = totalParkAvail;
-        }
-
-        function renderParkingStations() {
-            const listEl = document.getElementById('parking-list');
-            listEl.innerHTML = '';
-            
-            if(parkingStations.length === 0) {
-                listEl.innerHTML = '<div class="loading-text">沒有找到停車場資料</div>';
-                return;
-            }
-
-            // 顯示最近的 30 個停車場
-            const displayParkings = parkingStations.slice(0, 30);
-
-            displayParkings.forEach(park => {
-                let statusClass = 'status-good';
-                let availText = park.available;
-                let totalText = '車位';
-
-                if (park.available === 0) {
-                    statusClass = 'status-full';
-                    availText = '0';
-                } else if (park.available < 0) {
-                    statusClass = 'status-unknown';
-                    availText = '無數據'; 
-                    totalText = '未提供即時資訊';
-                } else if (park.available < 15) {
-                    statusClass = 'status-warning';
-                }
-
-                listEl.innerHTML += `
-                    <div class="park-item ${statusClass}">
-                        <div class="park-info">
-                            <div class="park-title">${park.name}</div>
-                            <div class="park-address">${park.address}</div>
-                            <div class="park-distance">${park.distance}</div>
-                        </div>
-                        <div class="park-numbers">
-                            <div class="park-available">${availText}</div>
-                            <div class="park-total">${totalText}</div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-
-        function renderEvStations() {
-            const evListEl = document.getElementById('ev-list');
-            evListEl.innerHTML = '';
-            evStations.forEach(station => {
-                const isOffline = station.status === 'offline';
-                const fastClass = (station.fast.total === 0) ? '' : (station.fast.available === 0 ? 'available-none' : (station.fast.available <= 1 ? 'available-low' : 'available-high'));
-                const mediumClass = (station.medium.total === 0) ? '' : (station.medium.available === 0 ? 'available-none' : (station.medium.available <= 1 ? 'available-low' : 'available-high'));
-
-                evListEl.innerHTML += `
-                    <div class="ev-item ${isOffline ? 'offline' : ''}">
-                        <div class="ev-header">
-                            <div class="ev-title">${station.name}</div>
-                            <div class="ev-address">${station.address}</div>
-                            <div class="ev-distance">${station.distance}</div>
-                        </div>
-                        <div class="ev-chargers">
-                            <div class="charger-type">
-                                <span class="charger-label">快速充電 (DC)</span>
-                                <div class="charger-data ${fastClass}">
-                                    <span>${station.fast.available}</span> / ${station.fast.total}
-                                </div>
-                            </div>
-                            <div class="charger-type">
-                                <span class="charger-label">中速充電 (AC)</span>
-                                <div class="charger-data ${mediumClass}">
-                                    <span>${station.medium.available}</span> / ${station.medium.total}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            });
-        }
-    </script>
+    button.addEventListener("click", loadNearby);
+    $("#radius").addEventListener("change", () => {
+      if (results.children.length) loadNearby();
+    });
+  </script>
 </body>
 </html>
