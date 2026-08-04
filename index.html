@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Charge & Park Metro</title>
+    <style>
+        /* 基礎 Metro UI 設定 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            overflow-x: hidden;
+            display: flex;
+            justify-content: center;
+        }
+
+        .app-container {
+            width: 100%;
+            max-width: 480px; /* 模擬手機寬度 */
+            min-height: 100vh;
+            background-color: #000000;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        /* 頂部導覽列 (Pivot Headers) */
+        .pivot-container {
+            padding: 20px 20px 10px 20px;
+            display: flex;
+            overflow-x: auto;
+            white-space: nowrap;
+            scrollbar-width: none; /* Firefox */
+        }
+        .pivot-container::-webkit-scrollbar {
+            display: none; /* Chrome/Safari */
+        }
+
+        .pivot-header {
+            font-size: 48px;
+            font-weight: 300;
+            color: #555555;
+            margin-right: 25px;
+            cursor: pointer;
+            transition: color 0.3s;
+            text-transform: lowercase;
+            letter-spacing: -1px;
+        }
+
+        .pivot-header.active {
+            color: #ffffff;
+        }
+
+        /* 頁面內容區 */
+        .pivot-content {
+            flex: 1;
+            padding: 0 20px 20px 20px;
+            overflow-y: auto;
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .pivot-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateX(20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* 頂部狀態列 (假想地圖/工具列) */
+        .status-bar {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-text {
+            font-size: 14px;
+            color: #888;
+        }
+
+        /* 列表項目設計 (List Items) */
+        .list-item {
+            background-color: #1a1a1a;
+            padding: 15px;
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 5px solid #333;
+        }
+
+        /* 車位充裕狀態顏色 */
+        .list-item.status-good { border-left-color: #60a917; } /* 綠色 */
+        .list-item.status-warning { border-left-color: #fa6800; } /* 橙色 */
+        .list-item.status-full { border-left-color: #ce352c; opacity: 0.7; } /* 紅色 */
+
+        /* 電動車專用綠色背景 */
+        .list-item.ev-tile {
+            background-color: #60a917;
+            border-left: none;
+            flex-direction: column;
+            align-items: flex-start;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .list-item.ev-tile::before {
+            content: '';
+            position: absolute;
+            right: -20px;
+            bottom: -20px;
+            width: 100px;
+            height: 100px;
+            background: rgba(255,255,255,0.1);
+            transform: rotate(45deg);
+        }
+
+        .item-info {
+            flex: 1;
+        }
+
+        .item-title {
+            font-size: 20px;
+            font-weight: 400;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .item-address {
+            font-size: 12px;
+            color: #aaaaaa;
+            margin-bottom: 5px;
+        }
+
+        .item-distance {
+            font-size: 14px;
+            color: #d39c7b; /* 棕銅色，與你截圖風格相似 */
+        }
+        
+        .ev-tile .item-address, .ev-tile .item-distance {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .item-number-box {
+            text-align: right;
+            min-width: 60px;
+        }
+
+        .item-number {
+            font-size: 42px;
+            font-weight: 300;
+            line-height: 1;
+        }
+
+        .item-unit {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
+        
+        .ev-tile .item-unit {
+            color: rgba(255,255,255,0.8);
+        }
+
+        /* EV 細節數據 */
+        .ev-details {
+            width: 100%;
+            margin-top: 15px;
+            padding-top: 10px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .ev-stat {
+            font-size: 14px;
+        }
+        .ev-stat span {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        /* 首頁動態磚 */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+
+        .tile {
+            aspect-ratio: 1;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: #1ba1e2;
+            cursor: pointer;
+        }
+        
+        .tile.wide {
+            grid-column: span 2;
+            aspect-ratio: 2 / 1;
+        }
+
+        .tile-title {
+            font-size: 18px;
+        }
+
+        .tile-number {
+            font-size: 48px;
+            font-weight: 300;
+            text-align: right;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Pivot Headers -->
+        <div class="pivot-container" id="pivot-headers">
+            <span class="pivot-header active" data-target="home">home</span>
+            <span class="pivot-header" data-target="parking">parking</span>
+            <span class="pivot-header" data-target="ev">ev charge</span>
+        </div>
+
+        <!-- Home Page -->
+        <div class="pivot-content active" id="home">
+            <div class="status-bar">
+                <span class="status-text">上次更新: 剛剛</span>
+                <span class="status-text">定位: 北區</span>
+            </div>
+            
+            <div class="dashboard-grid">
+                <div class="tile wide" style="background-color: #a4c400;" onclick="switchTab('parking')">
+                    <div class="tile-title">附近空車位總數</div>
+                    <div class="tile-number" id="home-total-parking">--</div>
+                </div>
+                <div class="tile" style="background-color: #60a917;" onclick="switchTab('ev')">
+                    <div class="tile-title">可用快充</div>
+                    <div class="tile-number" id="home-fast-charge">--</div>
+                </div>
+                <div class="tile" style="background-color: #00aba9;" onclick="switchTab('ev')">
+                    <div class="tile-title">可用中充</div>
+                    <div class="tile-number" id="home-mid-charge">--</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Parking Page -->
+        <div class="pivot-content" id="parking">
+            <div class="status-bar">
+                <span class="status-text">搜尋半徑 2.0 公里</span>
+                <span class="status-text" style="color:#0078d7;">地圖檢視</span>
+            </div>
+            <div id="parking-list">
+                <!-- 列表將由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- EV Charge Page -->
+        <div class="pivot-content" id="ev">
+            <div class="status-bar">
+                <span class="status-text">僅顯示相容插頭</span>
+                <span class="status-text" style="color:#60a917;">篩選</span>
+            </div>
+            <div id="ev-list">
+                <!-- 列表將由 JS 渲染 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 模擬從 API 取得的數據 (按距離排序)
+        const mockData = {
+            parking: [
+                { id: 1, name: "上水匯停車場", address: "上水石湖墟龍琛路48號", distance: "1.1 公里", total: 100, available: 45 },
+                { id: 2, name: "粉嶺中心停車場", address: "粉嶺新運路33號", distance: "2.0 公里", total: 150, available: 12 },
+                { id: 3, name: "聯和墟市政大廈", address: "粉嶺和滿街9號", distance: "2.5 公里", total: 80, available: 0 },
+                { id: 4, name: "海聯廣場停車場", address: "粉嶺聯和墟和睦路9號", distance: "2.7 公里", total: 120, available: 85 }
+            ],
+            ev: [
+                { id: 1, name: "領展 - 祥華商場", address: "粉嶺新運路38號", distance: "1.8 公里", fastTotal: 2, fastAvail: 1, midTotal: 4, midAvail: 3 },
+                { id: 2, name: "中電 - 聯和墟", address: "粉嶺和滿街9號", distance: "2.5 公里", fastTotal: 3, fastAvail: 0, midTotal: 0, midAvail: 0 },
+                { id: 3, name: "Tesla 超充 - 上水", address: "上水彩園路", distance: "3.0 公里", fastTotal: 6, fastAvail: 4, midTotal: 0, midAvail: 0 }
+            ]
+        };
+
+        // 初始化與渲染
+        document.addEventListener('DOMContentLoaded', () => {
+            initPivot();
+            renderData();
+        });
+
+        // 處理 Metro Pivot 導覽切換邏輯
+        function initPivot() {
+            const headers = document.querySelectorAll('.pivot-header');
+            headers.forEach(header => {
+                header.addEventListener('click', () => {
+                    const targetId = header.getAttribute('data-target');
+                    switchTab(targetId);
+                });
+            });
+        }
+
+        function switchTab(targetId) {
+            // 更新 Header 樣式
+            document.querySelectorAll('.pivot-header').forEach(h => {
+                if(h.getAttribute('data-target') === targetId) {
+                    h.classList.add('active');
+                } else {
+                    h.classList.remove('active');
+                }
+            });
+
+            // 更新 Content 顯示
+            document.querySelectorAll('.pivot-content').forEach(c => {
+                if(c.id === targetId) {
+                    c.classList.add('active');
+                } else {
+                    c.classList.remove('active');
+                }
+            });
+            
+            // 將 active 的 header 滾動到可視範圍
+            const activeHeader = document.querySelector(`.pivot-header[data-target="${targetId}"]`);
+            activeHeader.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+        }
+
+        // 渲染列表數據
+        function renderData() {
+            // 渲染停車場列表
+            const parkingListEl = document.getElementById('parking-list');
+            let totalParking = 0;
+            
+            mockData.parking.forEach(park => {
+                totalParking += park.available;
+                
+                // 判斷空位狀態以決定左側邊框顏色
+                let statusClass = 'status-good';
+                if (park.available === 0) statusClass = 'status-full';
+                else if (park.available < 15) statusClass = 'status-warning';
+
+                const html = `
+                    <div class="list-item ${statusClass}">
+                        <div class="item-info">
+                            <div class="item-distance">${park.distance}</div>
+                            <div class="item-title">${park.name}</div>
+                            <div class="item-address">${park.address}</div>
+                        </div>
+                        <div class="item-number-box">
+                            <div class="item-number" style="color: ${park.available === 0 ? '#ce352c' : '#fff'}">${park.available}</div>
+                            <div class="item-unit">空車位</div>
+                        </div>
+                    </div>
+                `;
+                parkingListEl.innerHTML += html;
+            });
+
+            // 渲染充電站列表
+            const evListEl = document.getElementById('ev-list');
+            let totalFast = 0;
+            let totalMid = 0;
+
+            mockData.ev.forEach(station => {
+                totalFast += station.fastAvail;
+                totalMid += station.midAvail;
+
+                const html = `
+                    <div class="list-item ev-tile">
+                        <div class="item-distance">${station.distance}</div>
+                        <div class="item-title">${station.name}</div>
+                        <div class="item-address">${station.address}</div>
+                        
+                        <div class="ev-details">
+                            <div class="ev-stat">
+                                快充 <span>${station.fastAvail}</span> / ${station.fastTotal}
+                            </div>
+                            <div class="ev-stat">
+                                中充 <span>${station.midAvail}</span> / ${station.midTotal}
+                            </div>
+                        </div>
+                    </div>
+                `;
+                evListEl.innerHTML += html;
+            });
+
+            // 更新首頁 Dashboard 數字
+            document.getElementById('home-total-parking').innerText = totalParking;
+            document.getElementById('home-fast-charge').innerText = totalFast;
+            document.getElementById('home-mid-charge').innerText = totalMid;
+        }
+    </script>
+</body>
+</html>
