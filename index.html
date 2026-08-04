@@ -28,20 +28,22 @@
         .app-container {
             width: 100%;
             max-width: 480px;
-            min-height: 100vh;
+            height: 100vh;
             background-color: #000000;
             display: flex;
             flex-direction: column;
             position: relative;
+            overflow: hidden;
         }
 
         /* 頂部導覽列 */
         .pivot-container {
-            padding: 30px 20px 10px 20px;
+            padding: 25px 20px 10px 20px;
             display: flex;
             overflow-x: auto;
             white-space: nowrap;
             scrollbar-width: none;
+            flex-shrink: 0;
         }
         .pivot-container::-webkit-scrollbar { display: none; }
 
@@ -58,7 +60,7 @@
 
         .pivot-header.active { color: #ffffff; }
 
-        /* 頁面內容區 */
+        /* 通用頁面內容區 */
         .pivot-content {
             flex: 1;
             padding: 0 20px 20px 20px;
@@ -68,6 +70,16 @@
         }
 
         .pivot-content.active { display: block; }
+
+        /* 特別處理 #nearby 頁面：上下固定 + 無寬地圖 */
+        #nearby.pivot-content {
+            padding: 0;
+            overflow: hidden;
+        }
+        #nearby.pivot-content.active {
+            display: flex;
+            flex-direction: column;
+        }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: translateX(15px); }
@@ -90,14 +102,14 @@
             text-transform: lowercase;
         }
 
-        /* Nearby 地圖視圖與控制項 */
+        /* Nearby 地圖視圖（貼合螢幕左右邊界 0 Distance） */
         .map-wrapper {
             position: relative;
             width: 100%;
-            height: 260px;
+            height: 220px;
             background-color: #111;
-            margin-bottom: 15px;
-            border: 1px solid #333;
+            flex-shrink: 0;
+            border-bottom: 1px solid #222;
         }
 
         #map {
@@ -107,13 +119,13 @@
 
         .map-locate-btn {
             position: absolute;
-            top: 15px;
-            left: 15px;
+            top: 12px;
+            left: 12px;
             z-index: 10;
-            width: 36px;
-            height: 36px;
-            background: rgba(0, 0, 0, 0.75);
-            border: 1px solid #555;
+            width: 34px;
+            height: 34px;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid #444;
             color: #fa6800;
             display: flex;
             align-items: center;
@@ -125,18 +137,21 @@
 
         /* 半徑滑桿 Metro 風格 */
         .radius-control {
-            margin-bottom: 15px;
+            padding: 12px 20px 8px 20px;
+            background-color: #000000;
+            flex-shrink: 0;
+            border-bottom: 1px solid #1a1a1a;
         }
 
         .radius-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
         }
 
-        .radius-title { font-size: 18px; font-weight: 300; }
-        .radius-value { font-size: 20px; color: #fa6800; font-weight: 400; }
+        .radius-title { font-size: 16px; font-weight: 300; }
+        .radius-value { font-size: 18px; color: #fa6800; font-weight: 400; }
 
         .slider-container {
             width: 100%;
@@ -153,31 +168,40 @@
 
         input[type=range]::-webkit-slider-runnable-track {
             width: 100%;
-            height: 6px;
+            height: 5px;
             cursor: pointer;
             background: #fa6800;
-            border-radius: 3px;
+            border-radius: 2px;
         }
 
         input[type=range]::-webkit-slider-thumb {
-            height: 22px;
+            height: 20px;
             width: 10px;
             background: #ffffff;
             border: 1px solid #fa6800;
             cursor: pointer;
             -webkit-appearance: none;
-            margin-top: -8px;
+            margin-top: -7px;
         }
 
         .radius-labels {
             display: flex;
             justify-content: space-between;
-            font-size: 12px;
+            font-size: 11px;
             color: #666;
-            margin-top: 5px;
+            margin-top: 4px;
         }
 
-        /* 地圖精細標籤樣式 (解決阻擋地圖問題) */
+        /* 獨立滾動的 Nearby 列表區域 */
+        #nearby-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 15px 20px 15px;
+            position: relative;
+            scroll-behavior: smooth; /* 平滑滾動 */
+        }
+
+        /* 地圖精細標籤樣式 */
         .park-marker-container {
             display: flex;
             align-items: center;
@@ -208,7 +232,6 @@
             transition: all 0.3s ease;
         }
 
-        /* 地圖標籤高亮選中狀態 */
         .park-marker-container.active .park-marker-dot {
             background-color: #fa6800;
             transform: scale(1.6);
@@ -222,7 +245,6 @@
             background: rgba(0, 0, 0, 0.95);
         }
 
-        /* 倒地使用者位置標籤 */
         .user-marker {
             width: 12px;
             height: 12px;
@@ -241,11 +263,11 @@
             border-bottom: 1px solid #222;
             border-left: 4px solid transparent;
             cursor: pointer;
-            transition: background-color 0.3s ease, border-left-color 0.3s ease, transform 0.2s ease;
+            transition: background-color 0.3s ease, border-left-color 0.3s ease;
         }
 
         .nearby-item.active {
-            background-color: rgba(250, 104, 0, 0.15);
+            background-color: rgba(250, 104, 0, 0.18);
             border-left-color: #fa6800;
         }
 
@@ -407,11 +429,13 @@
 
         <!-- Nearby Page (地圖與半徑搜尋) -->
         <div class="pivot-content active" id="nearby">
+            <!-- 固定地圖 (全寬 Edge-to-Edge) -->
             <div class="map-wrapper">
                 <div class="map-locate-btn" onclick="centerUserLocation()" title="重新定位">⊕</div>
                 <div id="map"></div>
             </div>
 
+            <!-- 固定滑桿控制項 -->
             <div class="radius-control">
                 <div class="radius-header">
                     <span class="radius-title">搜尋半徑</span>
@@ -426,6 +450,7 @@
                 </div>
             </div>
 
+            <!-- 下方獨立滾動列表 -->
             <div id="nearby-list">
                 <div class="loading-text">正在取得位置與資料...</div>
             </div>
@@ -499,9 +524,9 @@
         let lastPosition = null;
         let map = null;
         let userMarker = null;
-        let mapMarkersMap = new Map(); // 儲存 parkId -> maplibregl.Marker
+        let mapMarkersMap = new Map();
         let currentRadius = 5.0; 
-        let selectedParkId = null; // 當前選中的停車場 ID
+        let selectedParkId = null;
 
         const BASIC_URL = "https://resource.data.one.gov.hk/td/carpark/basic_info_all.json";
         const VACANCY_URL = "https://resource.data.one.gov.hk/td/carpark/vacancy_all.json";
@@ -541,13 +566,13 @@
             }
         }
 
-        // 地圖初始化 (MapLibre GL JS)
         function initMap() {
             map = new maplibregl.Map({
                 container: 'map',
                 style: 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json',
                 center: [114.2140, 22.3235],
-                zoom: 13
+                zoom: 13,
+                attributionControl: false
             });
         }
 
@@ -698,7 +723,7 @@
             updateDashboard();
         }
 
-        // 雙向互動核心：選中特定停車場（地圖飛行 + 列表平滑置中高亮）
+        // 精確連動邏輯：地圖飛行 + 精確將列表項目置於「列表視窗區域中央」
         function selectCarpark(parkId) {
             selectedParkId = parkId;
             const park = parkingStations.find(p => p.id === parkId);
@@ -724,24 +749,35 @@
                 }
             });
 
-            // 3. 更新列表項目高亮狀態並平滑置中
+            // 3. 更新列表項目高亮，並計算距離「列表視窗中央」的偏移量平滑滾動
+            const listContainer = document.getElementById('nearby-list');
             const listItems = document.querySelectorAll('.nearby-item');
+            
             listItems.forEach(item => {
                 if (item.dataset.id === parkId) {
                     item.classList.add('active');
-                    item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    
+                    // 精確計算置中 Top 距離（相對於 #nearby-list 容器視窗，非全螢幕）
+                    const containerHeight = listContainer.clientHeight;
+                    const itemTop = item.offsetTop - listContainer.offsetTop;
+                    const itemHeight = item.clientHeight;
+                    const targetScrollTop = itemTop - (containerHeight / 2) + (itemHeight / 2);
+
+                    listContainer.scrollTo({
+                        top: targetScrollTop,
+                        behavior: 'smooth'
+                    });
                 } else {
                     item.classList.remove('active');
                 }
             });
         }
 
-        // 渲染 Nearby 頁面 (解決巨型圖案問題，使用細小藍點 + 車位數字標籤)
+        // 渲染 Nearby 頁面
         function renderNearbyPage() {
             const listEl = document.getElementById('nearby-list');
             listEl.innerHTML = '';
 
-            // 清除現有地圖標記
             mapMarkersMap.forEach(m => m.remove());
             mapMarkersMap.clear();
 
@@ -755,7 +791,7 @@
             filtered.forEach(park => {
                 const vacancyInfo = formatVacancy(park.vacancyType, park.vacancy);
                 
-                // 正確建立細小藍點 + 數字標籤 Custom DOM Marker
+                // 地圖細小標籤 Marker
                 if (map) {
                     const container = document.createElement('div');
                     container.className = `park-marker-container ${selectedParkId === park.id ? 'active' : ''}`;
@@ -765,13 +801,11 @@
                         <div class="park-marker-badge">${vacancyInfo.text}</div>
                     `;
 
-                    // 點擊地圖藍點觸發連動
                     container.addEventListener('click', (e) => {
                         e.stopPropagation();
                         selectCarpark(park.id);
                     });
 
-                    // 使用選項物件傳入 element，確保不產生預設大藍水滴
                     const marker = new maplibregl.Marker({ element: container, anchor: 'left' })
                         .setLngLat([park.longitude, park.latitude])
                         .addTo(map);
@@ -779,7 +813,7 @@
                     mapMarkersMap.set(park.id, marker);
                 }
 
-                // 建立列表項目（點擊列表項目觸發連動）
+                // 下方列表項目
                 const itemEl = document.createElement('div');
                 itemEl.className = `nearby-item ${selectedParkId === park.id ? 'active' : ''}`;
                 itemEl.dataset.id = park.id;
