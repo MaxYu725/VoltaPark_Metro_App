@@ -13,6 +13,7 @@ let mapMarkersMap = new Map();
 let lineDistanceMarker = null;
 let currentRadius = 5.0; 
 let selectedParkId = null;
+let autoRefreshTimer = null;
 
 const BASIC_URL = "https://resource.data.one.gov.hk/td/carpark/basic_info_all.json";
 const VACANCY_URL = "https://resource.data.one.gov.hk/td/carpark/vacancy_all.json";
@@ -22,6 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initRadiusSlider();
     startAppProcess();
+    initAutoRefresh();
 });
 
 function initPivot() {
@@ -79,8 +81,116 @@ function initRadiusSlider() {
     slider.addEventListener('input', (e) => {
         currentRadius = parseFloat(e.target.value);
         valDisplay.innerText = formatDistanceDisplay(currentRadius);
+        updateRadiusCircleOnMap();
         renderNearbyPage();
     });
+}
+
+function createCircleGeoJSON(centerLng, centerLat, radiusKm, points = 64) {
+    const coords = [];
+    const distanceX = radiusKm / (111.320 * Math.cos(centerLat * Math.PI / 180));
+    const distanceY = radiusKm / 110.574;
+    for (let i = 0; i < points; i++) {
+        const theta = (i / points) * (2 * Math.PI);
+        const x = distanceX * Math.cos(theta);
+        const y = distanceY * Math.sin(theta);
+        coords.push([centerLng + x, centerLat + y]);
+    }
+    coords.push(coords[0]);
+    return {
+        'type': 'Feature',
+        'geometry': {
+            'type': 'Polygon',
+            'coordinates': [coords]
+        }
+    };
+}
+
+function updateRadiusCircleOnMap() {
+    if (!map || !lastPosition) return;
+    const uLng = lastPosition.coords.longitude;
+    const uLat = lastPosition.coords.latitude;
+    const circleGeoJSON = createCircleGeoJSON(uLng, uLat, currentRadius);
+
+    if (map.getSource('radius-circle-source')) {
+        map.getSource('radius-circle-source').setData(circleGeoJSON);
+    } else {
+        map.addSource('radius-circle-source', {
+            'type': 'geojson',
+            'data': circleGeoJSON
+        });
+        map.addLayer({
+            'id': 'radius-circle-fill',
+            'type': 'fill',
+            'source': 'radius-circle-source',
+            'paint': {
+                'fill-color': '#fa6800',
+                'fill-opacity': 0.08
+            }
+        });
+        map.addLayer({
+            'id': 'radius-circle-line',
+            'type': 'line',
+            'source': 'radius-circle-source',
+            'paint': {
+                'line-color': '#fa6800',
+                'line-width': 1.5,
+                'line-dasharray': [2, 2]
+            }
+        });
+    }
+}
+
+function initAutoRefresh() {
+    startAutoRefresh();
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopAutoRefresh();
+        } else {
+            refreshDataImmediately();
+            startAutoRefresh();
+        }
+    });
+}
+
+function startAutoRefresh() {
+    stopAutoRefresh();
+    autoRefreshTimer = setInterval(() => {
+        if (!document.hidden) {
+            refreshDataImmediately();
+        }
+    }, 10000);
+}
+
+function stopAutoRefresh() {
+    if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+    }
+}
+
+async function refreshDataImmediately() {
+    try {
+        const [basicResponse, vacancyResponse] = await Promise.all([
+            fetch(BASIC_URL, { cache: "no-store" }),
+            fetch(VACANCY_URL, { cache: "no-store" })
+        ]);
+
+        if (!basicResponse.ok || !vacancyResponse.ok) return;
+
+        const [basicData, vacancyData] = await Promise.all([basicResponse.json(), vacancyResponse.json()]);
+        cachedData = normalizeGovernmentData(basicData, vacancyData);
+
+        if (lastPosition) {
+            processDataWithLocation(lastPosition.coords.latitude, lastPosition.coords.longitude);
+        } else {
+            parkingStations = cachedData;
+            renderParkingStations();
+            renderNearbyPage();
+        }
+    } catch (e) {
+        console.error(e);
+    }
 }
 
 function distanceKm(lat1, lon1, lat2, lon2) {
@@ -173,6 +283,7 @@ async function startAppProcess() {
                 const el = document.createElement('div');
                 el.className = 'user-marker';
                 userMarker = new maplibregl.Marker({ element: el }).setLngLat([uLng, uLat]).addTo(map);
+                updateRadiusCircleOnMap();
             }
 
             processDataWithLocation(uLat, uLng);
@@ -207,6 +318,11 @@ function processDataWithLocation(userLat, userLon) {
     renderParkingStations();
     renderEvStations();
     updateDashboard();
+
+    if (selectedParkId) {
+        const selectedPark = parkingStations.find(p => p.id === selectedParkId);
+        if (selectedPark) updateConnectingLine(selectedPark);
+    }
 }
 
 function updateConnectingLine(park) {
@@ -248,17 +364,14 @@ function updateConnectingLine(park) {
         });
     }
 
-    const midLng = (uLng + pLng) / 2;
-    const midLat = (uLat + pLat) / 2;
-
     if (lineDistanceMarker) lineDistanceMarker.remove();
 
     const el = document.createElement('div');
     el.className = 'line-distance-badge';
     el.innerText = park.distanceDisplay;
 
-    lineDistanceMarker = new maplibregl.Marker({ element: el })
-        .setLngLat([midLng, midLat])
+    lineDistanceMarker = new maplibregl.Marker({ element: el, offset: [0, -26] })
+        .setLngLat([pLng, pLat])
         .addTo(map);
 }
 
@@ -378,6 +491,11 @@ function renderNearbyPage() {
 
         listEl.appendChild(itemEl);
     });
+
+    if (selectedParkId) {
+        const selectedPark = filtered.find(p => p.id === selectedParkId);
+        if (selectedPark) updateConnectingLine(selectedPark);
+    }
 }
 
 function updateStatusText(text) {
