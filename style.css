@@ -90,7 +90,7 @@ body {
 .map-wrapper {
     position: relative;
     width: 100%;
-    height: 220px;
+    height: 42vh;
     background-color: #111;
     flex-shrink: 0;
     border-bottom: 1px solid #222;
@@ -120,7 +120,7 @@ body {
 }
 
 .radius-control {
-    padding: 12px 20px 8px 20px;
+    padding: 10px 20px 6px 20px;
     background-color: #000000;
     flex-shrink: 0;
     border-bottom: 1px solid #1a1a1a;
@@ -130,11 +130,11 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
 }
 
-.radius-title { font-size: 16px; font-weight: 300; }
-.radius-value { font-size: 18px; color: #fa6800; font-weight: 400; }
+.radius-title { font-size: 15px; font-weight: 300; }
+.radius-value { font-size: 16px; color: #fa6800; font-weight: 400; }
 
 .slider-container {
     width: 100%;
@@ -151,14 +151,14 @@ input[type=range]:focus { outline: none; }
 
 input[type=range]::-webkit-slider-runnable-track {
     width: 100%;
-    height: 5px;
+    height: 4px;
     cursor: pointer;
     background: #fa6800;
     border-radius: 2px;
 }
 
 input[type=range]::-webkit-slider-thumb {
-    height: 20px;
+    height: 18px;
     width: 10px;
     background: #ffffff;
     border: 1px solid #fa6800;
@@ -172,7 +172,7 @@ input[type=range]::-webkit-slider-thumb {
     justify-content: space-between;
     font-size: 11px;
     color: #666;
-    margin-top: 4px;
+    margin-top: 3px;
 }
 
 #nearby-list {
@@ -235,7 +235,7 @@ input[type=range]::-webkit-slider-thumb {
 }
 
 .line-distance-badge {
-    background: rgba(0, 0, 0, 0.9);
+    background: rgba(0, 0, 0, 0.95);
     border: 1px solid #fa6800;
     color: #fa6800;
     font-size: 11px;
